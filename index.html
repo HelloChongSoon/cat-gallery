@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Cat Grid Example</title>
+  <style>
+    /* Responsive grid with 3 columns */
+    .imgrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    /* Responsive breakpoints */
+    @media (max-width: 768px) {
+      .imgrid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        padding: 15px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .imgrid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 10px;
+      }
+    }
+    
+    .imgrid img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .imgrid img:hover {
+      transform: scale(1.05);
+    }
+    
+    /* Loading and error states */
+    .loading, .error {
+      text-align: center;
+      padding: 40px;
+      font-size: 18px;
+      color: #666;
+      grid-column: 1 / -1;
+    }
+    
+    .error {
+      color: #e74c3c;
+    }
+    
+    /* Refresh status banner */
+    .status {
+      display: none;
+      text-align: center;
+      padding: 10px 14px;
+      margin: 0 20px 10px;
+      border-radius: 10px;
+      color: #0b5b22;
+      background: #eaf7ee;
+      border: 1px solid #c6ebd2;
+      font-size: 14px;
+    }
+    
+    /* Header styling */
+    h1 {
+      text-align: center;
+      color: #333;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐱 Cat Gallery</h1>
+  <div class="maincontent">
+    <div id="status" class="status">Fetching new cats…</div>
+    <div id="grid" class="imgrid">
+      <div class="loading">Loading adorable cats...</div>
+    </div>
+  </div>
+
+<script>
+  // API URL (no API key committed)
+  const url = `https://api.thecatapi.com/v1/images/search?limit=24`;
+
+  function renderCats(data) {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    data.forEach((imageData, index) => {
+      const image = document.createElement('img');
+      image.src = imageData.url;
+      image.alt = `Cat image ${index + 1}`;
+      image.loading = 'lazy';
+      image.addEventListener('click', () => {
+        window.open(imageData.url, '_blank');
+      });
+      const gridCell = document.createElement('div');
+      gridCell.appendChild(image);
+      grid.appendChild(gridCell);
+    });
+  }
+
+  function loadCats(options = { isRefresh: false }) {
+    const { isRefresh } = options;
+    const grid = document.getElementById('grid');
+    const status = document.getElementById('status');
+    if (isRefresh) {
+      status.textContent = 'Fetching new cats…';
+      status.style.display = 'block';
+    } else {
+      grid.innerHTML = '<div class="loading">Loading adorable cats...</div>';
+    }
+
+    // If you have an API key, set it in localStorage as 'CAT_API_KEY'
+    const apiKey = localStorage.getItem('CAT_API_KEY');
+    const fetchOptions = apiKey ? { headers: { 'x-api-key': apiKey } } : {};
+
+    fetch(url, fetchOptions)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        renderCats(data);
+      })
+      .catch(error => {
+        console.error('Error fetching cats:', error);
+        grid.innerHTML = '<div class="error">Failed to load cats. Please check your internet connection and try again.</div>';
+      })
+      .finally(() => {
+        if (isRefresh) {
+          status.style.display = 'none';
+        }
+      });
+  }
+
+  // Initial load
+  loadCats();
+
+  // Auto-refresh every 30 minutes
+  setInterval(() => {
+    loadCats({ isRefresh: true });
+  }, 30 * 60 * 1000);
+</script>
+</body>
+</html>
