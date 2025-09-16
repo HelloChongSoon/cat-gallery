@@ -16,8 +16,9 @@
   </div>
 
 <script>
-  // API URL (no API key committed)
-  const url = `https://api.thecatapi.com/v1/images/search?limit=24`;
+  // API base URL and desired image count
+  const API_BASE = `https://api.thecatapi.com/v1/images/search`;
+  const TARGET_COUNT = 24;
 
   function renderCats(data) {
     const grid = document.getElementById('grid');
@@ -51,15 +52,36 @@
 
     // If you have an API key, set it in localStorage as 'CAT_API_KEY'
     const apiKey = localStorage.getItem('CAT_API_KEY');
-    const fetchOptions = apiKey ? { headers: { 'x-api-key': apiKey } } : {};
 
-    fetch(url, fetchOptions)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
+    // Helper to fetch a page with a specific limit
+    const fetchPage = (limit) => {
+      const url = `${API_BASE}?limit=${limit}`;
+      const opts = apiKey ? { headers: { 'x-api-key': apiKey } } : {};
+      return fetch(url, opts).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      });
+    };
+
+    // Strategy:
+    // - With API key: single request for TARGET_COUNT
+    // - Without key: batch multiple requests (max ~10 per request) until we hit TARGET_COUNT
+    const performFetch = async () => {
+      if (apiKey) {
+        return fetchPage(TARGET_COUNT);
+      }
+      const maxPerRequest = 10;
+      const neededBatches = Math.ceil(TARGET_COUNT / maxPerRequest);
+      const promises = Array.from({ length: neededBatches }, (_, i) => {
+        const remaining = TARGET_COUNT - i * maxPerRequest;
+        const thisLimit = Math.min(maxPerRequest, remaining);
+        return fetchPage(thisLimit);
+      });
+      const results = await Promise.all(promises);
+      return results.flat().slice(0, TARGET_COUNT);
+    };
+
+    performFetch()
       .then(data => {
         renderCats(data);
       })
