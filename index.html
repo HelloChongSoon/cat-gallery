@@ -125,6 +125,17 @@
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
   });
+  
+  // Vercel Speed Insights for static HTML (ESM via CDN)
+  // Works on Vercel deployments; harmless locally
+  try {
+    const moduleUrl = 'https://esm.sh/@vercel/speed-insights@latest';
+    import(moduleUrl).then(({ injectSpeedInsights }) => {
+      if (typeof injectSpeedInsights === 'function') {
+        injectSpeedInsights();
+      }
+    }).catch(() => {});
+  } catch (_) {}
 </script>
 </body>
 </html>
