@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, BookOpen, Home, Play, Info, AlertCircle, Mic } from 'lucide-react'
+import { Settings, BookOpen, Home, Play, Info, AlertCircle, Mic, CheckCircle2, Clock, Wifi, WifiOff } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -281,6 +281,73 @@ export default function AppPage() {
                         <Mic className="w-3 h-3 mr-1" />
                         Try Again
                       </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Production Status Card */}
+              {!isDemoMode && agora.isConnected && agora.tokenInfo && (
+                <Card className="w-full max-w-sm mb-6 p-4 bg-card/50">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Connection Status</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-xs text-green-600 font-medium">Connected</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Token Status</span>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="text-xs text-foreground">Generated</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Token Expires In</span>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <span className={`text-xs font-mono ${
+                          agora.tokenExpiresIn && agora.tokenExpiresIn < 300 
+                            ? 'text-orange-500' 
+                            : 'text-foreground'
+                        }`}>
+                          {agora.tokenExpiresIn 
+                            ? `${Math.floor(agora.tokenExpiresIn / 60)}:${String(agora.tokenExpiresIn % 60).padStart(2, '0')}`
+                            : '--:--'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Mic Permission</span>
+                      <div className="flex items-center gap-1.5">
+                        {agora.permissionStatus === 'granted' ? (
+                          <>
+                            <Mic className="w-3 h-3 text-green-500" />
+                            <span className="text-xs text-green-600">Granted</span>
+                          </>
+                        ) : agora.permissionStatus === 'denied' ? (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-destructive" />
+                            <span className="text-xs text-destructive">Denied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Pending</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Channel</span>
+                      <span className="text-xs font-mono text-foreground">{agora.tokenInfo.channelName}</span>
                     </div>
                   </div>
                 </Card>

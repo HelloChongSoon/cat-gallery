@@ -1,16 +1,13 @@
 /**
- * PetChat AI - Agora Voice Hook
+ * PetChat AI - Agora Voice Hook (Production-Ready)
  * 
- * SETUP INSTRUCTIONS:
- * 1. Create an Agora account at https://console.agora.io
- * 2. Create a new project and get your App ID
- * 3. Generate a temporary token for testing (or null for testing mode)
- * 4. Set environment variables:
- *    - NEXT_PUBLIC_AGORA_APP_ID=your_app_id
- *    - NEXT_PUBLIC_AGORA_CHANNEL_NAME=petchat-demo
- *    - NEXT_PUBLIC_AGORA_TOKEN=your_temp_token (optional)
+ * SECURITY NOTES:
+ * - Tokens are generated server-side via /api/agora/token
+ * - App Certificate NEVER exists on the client
+ * - Tokens are short-lived (1 hour) and auto-renewed
+ * - Client only receives appId, token, channelName, uid from API
  * 
- * Without these variables, the app runs in Demo Mode.
+ * Without server credentials, the app runs in Demo Mode with simulated audio.
  */
 
 'use client'
@@ -19,6 +16,15 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 export type PermissionStatus = 'prompt' | 'granted' | 'denied' | 'unknown'
+
+export interface TokenInfo {
+  appId: string
+  token: string
+  channelName: string
+  uid: number
+  expiresAt: number
+  expiresIn: number
+}
 
 export interface UseAgoraVoiceReturn {
   isAgoraConfigured: boolean
@@ -36,6 +42,9 @@ export interface UseAgoraVoiceReturn {
   volumeLevel: number
   permissionStatus: PermissionStatus
   requestPermission: () => Promise<boolean>
+  // Production readiness info
+  tokenInfo: TokenInfo | null
+  tokenExpiresIn: number | null
 }
 
 // Store module reference to avoid multiple imports
@@ -54,6 +63,9 @@ async function getAgoraRTC() {
   return AgoraRTCModule
 }
 
+// Token renewal buffer: renew 5 minutes before expiry
+const TOKEN_RENEWAL_BUFFER_MS = 5 * 60 * 1000
+
 export function useAgoraVoice(): UseAgoraVoiceReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [isRecording, setIsRecording] = useState(false)
@@ -61,21 +73,21 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
   const [error, setError] = useState<string | null>(null)
   const [volumeLevel, setVolumeLevel] = useState(0)
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('unknown')
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
+  const [tokenExpiresIn, setTokenExpiresIn] = useState<number | null>(null)
+  const [isAgoraConfigured, setIsAgoraConfigured] = useState<boolean>(true) // Assume configured until proven otherwise
 
   // Use refs to store Agora objects to avoid re-renders and closure issues
   const clientRef = useRef<Awaited<ReturnType<typeof getAgoraRTC>> extends { createClient: (config: unknown) => infer C } ? C : unknown>(null)
   const localAudioTrackRef = useRef<unknown>(null)
   const volumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tokenExpiryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tokenRenewalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isPublishedRef = useRef(false)
   const sessionIdRef = useRef<string | null>(null)
   const cleanupInProgressRef = useRef(false)
+  const currentTokenInfoRef = useRef<TokenInfo | null>(null)
 
-  // Read env vars only on client side
-  const appId = typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_AGORA_APP_ID : undefined
-  const channelName = typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_AGORA_CHANNEL_NAME : undefined
-  const token = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_AGORA_TOKEN || null) : null
-
-  const isAgoraConfigured = Boolean(appId && channelName)
   const isConnected = connectionStatus === 'connected'
   const isConnecting = connectionStatus === 'connecting'
 
@@ -102,6 +114,103 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
     checkPermission()
   }, [])
 
+  // Token expiry countdown
+  useEffect(() => {
+    if (!tokenInfo) {
+      setTokenExpiresIn(null)
+      return
+    }
+
+    const updateExpiry = () => {
+      const now = Date.now()
+      const remaining = Math.max(0, Math.floor((tokenInfo.expiresAt - now) / 1000))
+      setTokenExpiresIn(remaining)
+    }
+
+    updateExpiry()
+    tokenExpiryIntervalRef.current = setInterval(updateExpiry, 1000)
+
+    return () => {
+      if (tokenExpiryIntervalRef.current) {
+        clearInterval(tokenExpiryIntervalRef.current)
+        tokenExpiryIntervalRef.current = null
+      }
+    }
+  }, [tokenInfo])
+
+  // Fetch token from server API
+  const fetchToken = useCallback(async (channelName: string, uid?: number): Promise<TokenInfo | null> => {
+    try {
+      const response = await fetch('/api/agora/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelName, uid }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }))
+        
+        if (errorData.code === 'NOT_CONFIGURED') {
+          setIsAgoraConfigured(false)
+          return null
+        }
+        
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const data: TokenInfo = await response.json()
+      setIsAgoraConfigured(true)
+      return data
+
+    } catch (err) {
+      console.error('[v0] Token fetch error:', err)
+      return null
+    }
+  }, [])
+
+  // Renew token before expiry
+  const renewToken = useCallback(async () => {
+    const client = clientRef.current as { renewToken?: (token: string) => Promise<void> } | null
+    const currentToken = currentTokenInfoRef.current
+
+    if (!client || !currentToken) return
+
+    try {
+      const newTokenInfo = await fetchToken(currentToken.channelName, currentToken.uid)
+      
+      if (newTokenInfo) {
+        await client.renewToken?.(newTokenInfo.token)
+        currentTokenInfoRef.current = newTokenInfo
+        setTokenInfo(newTokenInfo)
+        
+        // Schedule next renewal
+        scheduleTokenRenewal(newTokenInfo)
+      }
+    } catch (err) {
+      console.error('[v0] Token renewal failed:', err)
+      setError('Token renewal failed. Session may expire soon.')
+    }
+  }, [fetchToken])
+
+  // Schedule token renewal before expiry
+  const scheduleTokenRenewal = useCallback((tokenData: TokenInfo) => {
+    // Clear existing timeout
+    if (tokenRenewalTimeoutRef.current) {
+      clearTimeout(tokenRenewalTimeoutRef.current)
+      tokenRenewalTimeoutRef.current = null
+    }
+
+    const now = Date.now()
+    const renewalTime = tokenData.expiresAt - TOKEN_RENEWAL_BUFFER_MS
+    const delay = renewalTime - now
+
+    if (delay > 0) {
+      tokenRenewalTimeoutRef.current = setTimeout(() => {
+        renewToken()
+      }, delay)
+    }
+  }, [renewToken])
+
   // Cleanup function - fully stops and cleans up Agora resources
   const cleanup = useCallback(async () => {
     if (cleanupInProgressRef.current) return
@@ -112,6 +221,18 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       if (volumeIntervalRef.current) {
         clearInterval(volumeIntervalRef.current)
         volumeIntervalRef.current = null
+      }
+
+      // Stop token expiry countdown
+      if (tokenExpiryIntervalRef.current) {
+        clearInterval(tokenExpiryIntervalRef.current)
+        tokenExpiryIntervalRef.current = null
+      }
+
+      // Cancel token renewal
+      if (tokenRenewalTimeoutRef.current) {
+        clearTimeout(tokenRenewalTimeoutRef.current)
+        tokenRenewalTimeoutRef.current = null
       }
 
       // Get references before nulling
@@ -162,10 +283,13 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
 
       // Reset session
       sessionIdRef.current = null
+      currentTokenInfoRef.current = null
       setConnectionStatus('disconnected')
       setIsRecording(false)
       setVolumeLevel(0)
       setIsMicMuted(false)
+      setTokenInfo(null)
+      setTokenExpiresIn(null)
 
     } finally {
       cleanupInProgressRef.current = false
@@ -207,18 +331,6 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       return
     }
 
-    // Guard: Agora not configured
-    if (!isAgoraConfigured) {
-      setError('Agora credentials not configured. Running in Demo Mode.')
-      return
-    }
-
-    // Guard: no appId or channel
-    if (!appId || !channelName) {
-      setError('Missing Agora App ID or Channel Name.')
-      return
-    }
-
     // Create unique session ID to prevent duplicate sessions
     const newSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     sessionIdRef.current = newSessionId
@@ -226,6 +338,25 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
     try {
       setConnectionStatus('connecting')
       setError(null)
+
+      // Fetch token from server API
+      const channelName = 'petchat-demo' // Default channel name
+      const tokenData = await fetchToken(channelName)
+
+      // Check if session was cancelled during fetch
+      if (sessionIdRef.current !== newSessionId) {
+        return
+      }
+
+      // If no token (server not configured), fall back to demo mode
+      if (!tokenData) {
+        setConnectionStatus('error')
+        setError('Agora not configured on server. Running in Demo Mode.')
+        return
+      }
+
+      setTokenInfo(tokenData)
+      currentTokenInfoRef.current = tokenData
 
       // Dynamically import Agora SDK (browser-only)
       const AgoraRTC = await getAgoraRTC()
@@ -274,13 +405,25 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         }
       })
 
+      // Listen for token privilege will expire event
+      client.on('token-privilege-will-expire', async () => {
+        console.log('[v0] Token privilege will expire, renewing...')
+        await renewToken()
+      })
+
+      // Listen for token privilege did expire event
+      client.on('token-privilege-did-expire', async () => {
+        console.log('[v0] Token privilege expired, reconnecting...')
+        setError('Session expired. Please reconnect.')
+        setConnectionStatus('error')
+      })
+
       client.on('exception', (event) => {
         console.error('[v0] Agora exception:', event)
       })
 
-      // Join the channel
-      // Parameters: appId, channel, token (null for no token), uid (null for auto-assign)
-      await client.join(appId, channelName, token, null)
+      // Join the channel with server-generated token
+      await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid)
 
       // Verify session is still valid after join
       if (sessionIdRef.current !== newSessionId) {
@@ -289,6 +432,9 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         return
       }
 
+      // Schedule token renewal
+      scheduleTokenRenewal(tokenData)
+
       setConnectionStatus('connected')
       setError(null)
 
@@ -296,20 +442,21 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       // Reset on error
       clientRef.current = null
       sessionIdRef.current = null
+      currentTokenInfoRef.current = null
       setConnectionStatus('error')
+      setTokenInfo(null)
 
       // User-friendly error messages
       if (err instanceof Error) {
         const message = err.message.toLowerCase()
         const errorString = String(err)
         
-        // Check for gateway/token errors (CAN_NOT_GET_GATEWAY_SERVER)
         if (message.includes('gateway') || message.includes('can_not_get_gateway') || errorString.includes('CAN_NOT_GET_GATEWAY')) {
-          setError('Agora token expired or invalid. Falling back to Demo Mode. Generate a new token at console.agora.io')
+          setError('Agora token expired or invalid. Falling back to Demo Mode.')
         } else if (message.includes('invalid token') || message.includes('token expired') || message.includes('token')) {
-          setError('Agora token is invalid or expired. Please generate a new token at console.agora.io')
+          setError('Agora token is invalid or expired. Falling back to Demo Mode.')
         } else if (message.includes('invalid appid') || message.includes('app id')) {
-          setError('Invalid Agora App ID. Please check your credentials.')
+          setError('Invalid Agora App ID. Please check server configuration.')
         } else if (message.includes('channel')) {
           setError('Unable to join channel. Please check the channel name.')
         } else if (message.includes('network') || message.includes('timeout')) {
@@ -323,7 +470,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         setError('Failed to connect. Please try again.')
       }
     }
-  }, [connectionStatus, isAgoraConfigured, appId, channelName, token])
+  }, [connectionStatus, fetchToken, renewToken, scheduleTokenRenewal])
 
   const stopSession = useCallback(async () => {
     sessionIdRef.current = null
@@ -481,5 +628,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
     volumeLevel,
     permissionStatus,
     requestPermission,
+    tokenInfo,
+    tokenExpiresIn,
   }
 }
