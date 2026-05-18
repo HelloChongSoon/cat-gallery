@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Home, BookOpen, Settings, Edit3, Trash2, Info, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, Home, BookOpen, Settings, Edit3, Trash2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PetProfileCard } from '@/components/pet-profile-card'
@@ -41,13 +41,13 @@ export default function SettingsPage() {
     router.push('/')
   }
 
-  // Get connection status
-  const getConnectionStatus = () => {
+  // Get connection status for badge display
+  const getConnectionStatus = (): 'connected' | 'connecting' | 'demo-mode' | 'missing-credentials' | 'error' => {
     if (agora.error) return 'error'
     if (!agora.isAgoraConfigured) return 'demo-mode'
-    if (agora.isConnected) return 'connected'
-    if (agora.isConnecting) return 'connecting'
-    return 'missing-credentials'
+    if (agora.connectionStatus === 'connected') return 'connected'
+    if (agora.connectionStatus === 'connecting') return 'connecting'
+    return 'demo-mode'
   }
 
   if (!isHydrated) {
@@ -143,7 +143,7 @@ export default function SettingsPage() {
           </h2>
           
           <Card className="p-4">
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-foreground mb-1">Agora Voice</p>
                 <p className="text-xs text-muted-foreground">
@@ -154,28 +154,6 @@ export default function SettingsPage() {
                 status={getConnectionStatus()} 
                 error={agora.error}
               />
-            </div>
-            
-            <div className="bg-secondary/50 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Demo Mode uses simulated audio so you can test the experience 
-                  without Agora credentials. To enable real voice recording, 
-                  set the following environment variables:
-                </p>
-              </div>
-              <div className="mt-3 space-y-1" aria-label="Required environment variables">
-                <code className="block text-xs bg-background px-2 py-1 rounded font-mono text-foreground">
-                  NEXT_PUBLIC_AGORA_APP_ID
-                </code>
-                <code className="block text-xs bg-background px-2 py-1 rounded font-mono text-foreground">
-                  NEXT_PUBLIC_AGORA_CHANNEL_NAME
-                </code>
-                <code className="block text-xs bg-background px-2 py-1 rounded font-mono text-foreground">
-                  NEXT_PUBLIC_AGORA_TOKEN
-                </code>
-              </div>
             </div>
           </Card>
         </motion.section>
