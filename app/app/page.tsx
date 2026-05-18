@@ -3,37 +3,50 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, BookOpen, Home, Play, Info, AlertCircle, Mic, CheckCircle2, Clock, Wifi, WifiOff } from 'lucide-react'
+import { Settings, BookOpen, Home, Play, Info, AlertCircle, Mic, TrendingUp, Cat } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { PetProfileCard } from '@/components/pet-profile-card'
-import { PetProfileSetup } from '@/components/pet-profile-setup'
 import { VoiceRecorderButton } from '@/components/voice-recorder-button'
 import { WaveformVisualizer } from '@/components/waveform-visualizer'
-import { TranslationLoadingState } from '@/components/translation-loading-state'
-import { PetChatBubble } from '@/components/pet-chat-bubble'
-import { MoodInsightCard } from '@/components/mood-insight-card'
-import { ShareCard } from '@/components/share-card'
 import { ConnectionStatusBadge } from '@/components/connection-status-badge'
+import { ContextTagging } from '@/components/context-tagging'
+import { InterpretationResult, FeedbackForm } from '@/components/interpretation-result'
 import { useAgoraVoice } from '@/hooks/use-agora-voice'
 import { useMockVoice } from '@/hooks/use-mock-voice'
-import { loadPetProfile, savePetProfile, saveTranslation, generateId } from '@/lib/storage'
-import { generatePetTranslation } from '@/lib/translation-generator'
-import type { PetProfile, TranslationResult, RecordingState } from '@/lib/types'
+import { 
+  loadCatProfile, 
+  loadCatRoutine, 
+  loadMeowLogs,
+  saveMeowLog,
+  updateMeowLogFeedback,
+  generateId 
+} from '@/lib/storage'
+import { generateCareInterpretation } from '@/lib/interpretation-generator'
+import type { 
+  CatProfile, 
+  CatRoutine,
+  MeowSound, 
+  MeowContext, 
+  CareInterpretation,
+  MeowLogEntry,
+  RecordingState,
+  FeedbackAccuracy,
+  ActionThatHelped
+} from '@/lib/types'
 
 export default function AppPage() {
   const router = useRouter()
-  const [petProfile, setPetProfile] = useState<PetProfile | null>(null)
-  const [showProfileSetup, setShowProfileSetup] = useState(false)
+  const [catProfile, setCatProfile] = useState<CatProfile | null>(null)
+  const [catRoutine, setCatRoutine] = useState<CatRoutine | null>(null)
   const [recordingState, setRecordingState] = useState<RecordingState>('idle')
-  const [translation, setTranslation] = useState<TranslationResult | null>(null)
-  const [isSaved, setIsSaved] = useState(false)
+  const [currentSound, setCurrentSound] = useState<MeowSound | null>(null)
+  const [currentContext, setCurrentContext] = useState<MeowContext | null>(null)
+  const [interpretation, setInterpretation] = useState<CareInterpretation | null>(null)
+  const [currentLogEntry, setCurrentLogEntry] = useState<MeowLogEntry | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
-  const [copyFeedback, setCopyFeedback] = useState(false)
   
-  // Track if component is mounted
   const isMountedRef = useRef(true)
   const sessionStartedRef = useRef(false)
 
@@ -43,17 +56,18 @@ export default function AppPage() {
   // Mock voice hook for demo mode
   const mock = useMockVoice()
 
-  // Determine if we're in demo mode (not configured OR connection failed)
+  // Determine if we're in demo mode
   const isDemoMode = !agora.isAgoraConfigured || agora.connectionStatus === 'error'
 
-  // Hydration effect - load profile from localStorage
+  // Hydration effect
   useEffect(() => {
-    const profile = loadPetProfile()
+    const profile = loadCatProfile()
     if (!profile) {
       router.replace('/')
       return
     }
-    setPetProfile(profile)
+    setCatProfile(profile)
+    setCatRoutine(loadCatRoutine())
     setIsHydrated(true)
     
     return () => {
@@ -61,22 +75,21 @@ export default function AppPage() {
     }
   }, [router])
 
-  // Initialize Agora session when profile is loaded
+  // Initialize Agora session
   useEffect(() => {
-    if (!isHydrated || !petProfile || sessionStartedRef.current) return
+    if (!isHydrated || !catProfile || sessionStartedRef.current) return
     
-    if (agora.isAgoraConfigured && !agora.isConnected && !agora.isConnecting) {
+    if (agora.isAgoraConfigured && !agora.isConnected && agora.connectionStatus !== 'connecting') {
       sessionStartedRef.current = true
       agora.startSession()
     }
     
     return () => {
-      // Only cleanup on unmount, not on re-renders
       if (!isMountedRef.current && agora.isConnected) {
         agora.stopSession()
       }
     }
-  }, [isHydrated, petProfile, agora])
+  }, [isHydrated, catProfile, agora])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -86,101 +99,7 @@ export default function AppPage() {
     }
   }, [])
 
-  const handleProfileSave = useCallback((profile: PetProfile) => {
-    savePetProfile(profile)
-    setPetProfile(profile)
-  }, [])
-
-  const handleRecordStart = useCallback(() => {
-    if (!petProfile) return
-    
-    setRecordingState('listening')
-    setTranslation(null)
-    setIsSaved(false)
-
-    if (isDemoMode) {
-      mock.startRecording()
-    } else {
-      agora.startRecording()
-    }
-  }, [petProfile, isDemoMode, mock, agora])
-
-  const handleRecordStop = useCallback(async () => {
-    if (!petProfile || !isMountedRef.current) return
-
-    if (isDemoMode) {
-      mock.stopRecording()
-    } else {
-      await agora.stopRecording()
-    }
-
-    setRecordingState('translating')
-
-    // Simulate translation processing
-    await new Promise(resolve => setTimeout(resolve, 2500))
-
-    if (!isMountedRef.current) return
-
-    // Generate fake translation
-    const result = generatePetTranslation(petProfile, petProfile.type)
-    const fullResult: TranslationResult = {
-      ...result,
-      id: generateId(),
-      petId: petProfile.id,
-      createdAt: new Date().toISOString(),
-    }
-
-    setTranslation(fullResult)
-    setRecordingState('result')
-  }, [petProfile, isDemoMode, mock, agora])
-
-  const handleCopy = useCallback(async () => {
-    if (translation) {
-      try {
-        await navigator.clipboard.writeText(translation.translatedMessage)
-        setCopyFeedback(true)
-        setTimeout(() => setCopyFeedback(false), 2000)
-      } catch {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea')
-        textArea.value = translation.translatedMessage
-        document.body.appendChild(textArea)
-        textArea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textArea)
-        setCopyFeedback(true)
-        setTimeout(() => setCopyFeedback(false), 2000)
-      }
-    }
-  }, [translation])
-
-  const handleSave = useCallback(() => {
-    if (translation && !isSaved) {
-      saveTranslation(translation)
-      setIsSaved(true)
-    }
-  }, [translation, isSaved])
-
-  const handleReset = useCallback(() => {
-    setRecordingState('idle')
-    setTranslation(null)
-    setIsSaved(false)
-  }, [])
-
-  const handleDemoRecord = useCallback(() => {
-    if (!petProfile || recordingState !== 'idle') return
-    
-    handleRecordStart()
-    
-    // Auto-stop after 2 seconds for demo
-    setTimeout(() => {
-      if (isMountedRef.current) {
-        handleRecordStop()
-      }
-    }, 2000)
-  }, [petProfile, recordingState, handleRecordStart, handleRecordStop])
-
-  // Get connection status for badge display
+  // Get connection status for badge
   const getConnectionStatus = useCallback((): 'connected' | 'connecting' | 'demo-mode' | 'ready' | 'error' => {
     if (!agora.isAgoraConfigured) return 'demo-mode'
     if (agora.error) return 'error'
@@ -190,16 +109,103 @@ export default function AppPage() {
     return 'ready'
   }, [agora.isAgoraConfigured, agora.error, agora.connectionStatus])
 
-  // Handle microphone permission request
-  const handleRequestPermission = useCallback(async () => {
-    const granted = await agora.requestPermission()
-    if (granted && agora.isAgoraConfigured && !agora.isConnected) {
-      await agora.startSession()
-    }
-  }, [agora])
+  const handleRecordStart = useCallback(() => {
+    if (!catProfile) return
+    
+    setRecordingState('listening')
+    setCurrentSound(null)
+    setCurrentContext(null)
+    setInterpretation(null)
+    setCurrentLogEntry(null)
 
-  // Loading state during hydration
-  if (!isHydrated || !petProfile) {
+    if (isDemoMode) {
+      mock.startRecording()
+    } else {
+      agora.startRecording()
+    }
+  }, [catProfile, isDemoMode, mock, agora])
+
+  const handleRecordStop = useCallback(async () => {
+    if (!catProfile || !isMountedRef.current) return
+
+    if (isDemoMode) {
+      mock.stopRecording()
+    } else {
+      await agora.stopRecording()
+    }
+
+    // Move to context tagging
+    setRecordingState('context-tagging')
+  }, [catProfile, isDemoMode, mock, agora])
+
+  const handleContextComplete = useCallback((sound: MeowSound, context: MeowContext) => {
+    if (!catProfile || !catRoutine) return
+
+    setCurrentSound(sound)
+    setCurrentContext(context)
+    setRecordingState('interpreting')
+
+    // Generate interpretation
+    const recentLogs = loadMeowLogs()
+    const result = generateCareInterpretation(catProfile, catRoutine, sound, context, recentLogs)
+    
+    // Simulate processing time
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setInterpretation(result)
+        setRecordingState('result')
+      }
+    }, 1500)
+  }, [catProfile, catRoutine])
+
+  const handleSaveToLog = useCallback(() => {
+    if (!catProfile || !currentSound || !currentContext || !interpretation) return
+
+    const logEntry: MeowLogEntry = {
+      id: generateId(),
+      catId: catProfile.id,
+      createdAt: new Date().toISOString(),
+      sound: currentSound,
+      context: currentContext,
+      interpretation,
+      feedback: null,
+    }
+
+    saveMeowLog(logEntry)
+    setCurrentLogEntry(logEntry)
+    setRecordingState('feedback')
+  }, [catProfile, currentSound, currentContext, interpretation])
+
+  const handleReset = useCallback(() => {
+    setRecordingState('idle')
+    setCurrentSound(null)
+    setCurrentContext(null)
+    setInterpretation(null)
+    setCurrentLogEntry(null)
+  }, [])
+
+  const handleFeedbackSubmit = useCallback((accuracy: FeedbackAccuracy, action: ActionThatHelped | null) => {
+    if (!currentLogEntry) return
+
+    updateMeowLogFeedback(currentLogEntry.id, { accuracy, actionThatHelped: action })
+    handleReset()
+  }, [currentLogEntry, handleReset])
+
+  const handleDemoRecord = useCallback(() => {
+    if (!catProfile || recordingState !== 'idle') return
+    
+    handleRecordStart()
+    
+    // Auto-stop after 2 seconds for demo
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        handleRecordStop()
+      }
+    }, 2000)
+  }, [catProfile, recordingState, handleRecordStart, handleRecordStop])
+
+  // Loading state
+  if (!isHydrated || !catProfile) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background">
         <div 
@@ -213,7 +219,7 @@ export default function AppPage() {
 
   const currentVolumeLevel = isDemoMode ? mock.volumeLevel : agora.volumeLevel
   const isButtonDisabled = !isDemoMode && !agora.isConnected
-  const isConnecting = agora.isConnecting
+  const isConnecting = agora.connectionStatus === 'connecting'
   const showPermissionPrompt = !isDemoMode && agora.permissionStatus === 'denied'
 
   return (
@@ -228,10 +234,10 @@ export default function AppPage() {
           </Link>
           
           <div className="flex items-center gap-2">
-            <span className="text-2xl" role="img" aria-label={`${petProfile.name} avatar`}>
-              {petProfile.avatarEmoji}
+            <span className="text-2xl" role="img" aria-label={`${catProfile.name} avatar`}>
+              {catProfile.avatarEmoji}
             </span>
-            <span className="font-semibold text-foreground">{petProfile.name}</span>
+            <span className="font-semibold text-foreground">{catProfile.name}</span>
           </div>
           
           <Link href="/settings" aria-label="Go to settings">
@@ -270,84 +276,17 @@ export default function AppPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground mb-1">Microphone Access Denied</p>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Please enable microphone access in your browser settings to use voice recording.
+                        Please enable microphone access in your browser settings.
                       </p>
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={handleRequestPermission}
+                        onClick={() => agora.requestPermission()}
                         className="text-xs"
                       >
                         <Mic className="w-3 h-3 mr-1" />
                         Try Again
                       </Button>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Production Status Card */}
-              {!isDemoMode && agora.isConnected && agora.tokenInfo && (
-                <Card className="w-full max-w-sm mb-6 p-4 bg-card/50">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Connection Status</span>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs text-green-600 font-medium">Connected</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Token Status</span>
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
-                        <span className="text-xs text-foreground">Generated</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Token Expires In</span>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3 h-3 text-muted-foreground" />
-                        <span className={`text-xs font-mono ${
-                          agora.tokenExpiresIn && agora.tokenExpiresIn < 300 
-                            ? 'text-orange-500' 
-                            : 'text-foreground'
-                        }`}>
-                          {agora.tokenExpiresIn 
-                            ? `${Math.floor(agora.tokenExpiresIn / 60)}:${String(agora.tokenExpiresIn % 60).padStart(2, '0')}`
-                            : '--:--'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Mic Permission</span>
-                      <div className="flex items-center gap-1.5">
-                        {agora.permissionStatus === 'granted' ? (
-                          <>
-                            <Mic className="w-3 h-3 text-green-500" />
-                            <span className="text-xs text-green-600">Granted</span>
-                          </>
-                        ) : agora.permissionStatus === 'denied' ? (
-                          <>
-                            <AlertCircle className="w-3 h-3 text-destructive" />
-                            <span className="text-xs text-destructive">Denied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Mic className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">Pending</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Channel</span>
-                      <span className="text-xs font-mono text-foreground">{agora.tokenInfo.channelName}</span>
                     </div>
                   </div>
                 </Card>
@@ -359,17 +298,24 @@ export default function AppPage() {
                   <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-foreground mb-1">Demo Mode Active</p>
+                      <p className="text-sm font-medium text-foreground mb-1">Demo Mode</p>
                       <p className="text-xs text-muted-foreground">
-                        {agora.connectionStatus === 'error' 
-                          ? 'Agora connection failed. Using simulated audio for demo purposes.'
-                          : 'Real voice recording requires Agora credentials. Tap the demo button below to test with simulated audio.'
-                        }
+                        Try the experience with simulated meow sounds.
                       </p>
                     </div>
                   </div>
                 </Card>
               )}
+
+              {/* Instructions */}
+              <div className="text-center mb-8 max-w-sm">
+                <h2 className="text-lg font-semibold text-foreground mb-2">
+                  Ready to listen
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Hold the button while {catProfile.name} meows, then answer a few quick questions about the context.
+                </p>
+              </div>
 
               {/* Waveform Preview */}
               <div className="w-full max-w-sm mb-8">
@@ -380,7 +326,7 @@ export default function AppPage() {
               </div>
 
               {/* Recording Button */}
-              <div className="mb-16">
+              <div className="mb-8">
                 <VoiceRecorderButton
                   isRecording={false}
                   isLoading={isConnecting}
@@ -396,7 +342,6 @@ export default function AppPage() {
                   variant="outline"
                   className="gap-2"
                   onClick={handleDemoRecord}
-                  aria-label="Try demo recording with simulated pet sounds"
                 >
                   <Play className="w-4 h-4" />
                   Try Demo
@@ -415,10 +360,9 @@ export default function AppPage() {
               exit={{ opacity: 0 }}
             >
               <Badge variant="default" className="mb-6 animate-pulse">
-                Listening...
+                Listening to {catProfile.name}...
               </Badge>
 
-              {/* Active Waveform */}
               <div className="w-full max-w-sm mb-8">
                 <WaveformVisualizer 
                   volumeLevel={currentVolumeLevel} 
@@ -426,7 +370,6 @@ export default function AppPage() {
                 />
               </div>
 
-              {/* Recording Button */}
               <VoiceRecorderButton
                 isRecording={true}
                 onRecordStart={handleRecordStart}
@@ -436,60 +379,70 @@ export default function AppPage() {
             </motion.div>
           )}
 
-          {/* Translating State */}
-          {recordingState === 'translating' && (
+          {/* Context Tagging State */}
+          {recordingState === 'context-tagging' && (
             <motion.div
-              key="translating"
+              key="context-tagging"
+              className="max-w-sm mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ContextTagging
+                onComplete={handleContextComplete}
+                onBack={handleReset}
+              />
+            </motion.div>
+          )}
+
+          {/* Interpreting State */}
+          {recordingState === 'interpreting' && (
+            <motion.div
+              key="interpreting"
               className="flex flex-col items-center justify-center min-h-[60vh]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <TranslationLoadingState isVisible={true} />
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Cat className="w-8 h-8 text-primary animate-pulse" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Interpreting {catProfile.name}&apos;s meow...
+              </p>
             </motion.div>
           )}
 
           {/* Result State */}
-          {recordingState === 'result' && translation && (
+          {recordingState === 'result' && interpretation && (
             <motion.div
               key="result"
-              className="flex flex-col gap-4 max-w-sm mx-auto"
+              className="max-w-sm mx-auto"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {/* Pet Profile */}
-              <PetProfileCard 
-                profile={petProfile} 
-                size="sm"
-                onEdit={() => setShowProfileSetup(true)}
+              <InterpretationResult
+                interpretation={interpretation}
+                catName={catProfile.name}
+                onSave={handleSaveToLog}
+                onNewRecording={handleReset}
               />
+            </motion.div>
+          )}
 
-              {/* Chat Bubble */}
-              <PetChatBubble
-                message={translation.translatedMessage}
-                avatarEmoji={petProfile.avatarEmoji}
-                petName={petProfile.name}
-              />
-
-              {/* Mood Insights */}
-              <MoodInsightCard
-                mood={translation.mood}
-                intent={translation.intent}
-                confidence={translation.confidence}
-                severity={translation.severity}
-                suggestedAction={translation.suggestedAction}
-              />
-
-              {/* Share Actions */}
-              <ShareCard
-                message={translation.translatedMessage}
-                petName={petProfile.name}
-                onCopy={handleCopy}
-                onSave={handleSave}
-                onReset={handleReset}
-                isSaved={isSaved}
-                copyFeedback={copyFeedback}
+          {/* Feedback State */}
+          {recordingState === 'feedback' && (
+            <motion.div
+              key="feedback"
+              className="max-w-sm mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <FeedbackForm
+                onSubmit={handleFeedbackSubmit}
+                onSkip={handleReset}
               />
             </motion.div>
           )}
@@ -509,10 +462,17 @@ export default function AppPage() {
             </Button>
           </Link>
           
-          <Link href="/diary" aria-label="Translation diary">
+          <Link href="/log" aria-label="Meow Log">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
               <BookOpen className="w-5 h-5" />
-              <span className="text-xs">Diary</span>
+              <span className="text-xs">Meow Log</span>
+            </Button>
+          </Link>
+
+          <Link href="/insights" aria-label="Insights">
+            <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
+              <TrendingUp className="w-5 h-5" />
+              <span className="text-xs">Insights</span>
             </Button>
           </Link>
           
@@ -524,14 +484,6 @@ export default function AppPage() {
           </Link>
         </div>
       </nav>
-
-      {/* Profile Setup Modal */}
-      <PetProfileSetup
-        isOpen={showProfileSetup}
-        onClose={() => setShowProfileSetup(false)}
-        onSave={handleProfileSave}
-        initialProfile={petProfile}
-      />
     </main>
   )
 }
