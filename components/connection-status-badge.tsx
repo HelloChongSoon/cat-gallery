@@ -1,9 +1,10 @@
 'use client'
 
-import { Wifi, WifiOff, AlertCircle, PlayCircle } from 'lucide-react'
+import { Wifi, WifiOff, AlertCircle, PlayCircle, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
-type ConnectionStatus = 'connected' | 'demo-mode' | 'missing-credentials' | 'error'
+type ConnectionStatus = 'connected' | 'connecting' | 'demo-mode' | 'missing-credentials' | 'error'
 
 interface ConnectionStatusBadgeProps {
   status: ConnectionStatus
@@ -15,21 +16,31 @@ const statusConfig = {
     icon: Wifi,
     label: 'Connected',
     variant: 'success' as const,
+    className: '',
+  },
+  connecting: {
+    icon: Loader2,
+    label: 'Connecting...',
+    variant: 'secondary' as const,
+    className: 'animate-pulse',
   },
   'demo-mode': {
     icon: PlayCircle,
     label: 'Demo Mode',
     variant: 'secondary' as const,
+    className: '',
   },
   'missing-credentials': {
     icon: WifiOff,
     label: 'No Credentials',
     variant: 'warning' as const,
+    className: '',
   },
   error: {
     icon: AlertCircle,
     label: 'Error',
     variant: 'destructive' as const,
+    className: '',
   },
 }
 
@@ -38,13 +49,20 @@ export function ConnectionStatusBadge({ status, error }: ConnectionStatusBadgePr
   const Icon = config.icon
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <Badge variant={config.variant} className="gap-1.5">
-        <Icon className="w-3 h-3" />
+    <div className="flex flex-col items-center gap-1">
+      <Badge 
+        variant={config.variant} 
+        className={cn("gap-1.5", config.className)}
+        role="status"
+        aria-live="polite"
+      >
+        <Icon className={cn("w-3 h-3", status === 'connecting' && "animate-spin")} aria-hidden="true" />
         {config.label}
       </Badge>
       {error && status === 'error' && (
-        <span className="text-xs text-destructive">{error}</span>
+        <span className="text-xs text-destructive max-w-xs text-center" role="alert">
+          {error}
+        </span>
       )}
     </div>
   )

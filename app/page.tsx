@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Sparkles, ChevronRight, Mic } from 'lucide-react'
+import { Sparkles, ChevronRight, Mic, BookOpen, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PetProfileSetup } from '@/components/pet-profile-setup'
@@ -15,17 +15,20 @@ export default function LandingPage() {
   const router = useRouter()
   const [petProfile, setPetProfile] = useState<PetProfile | null>(null)
   const [showSetup, setShowSetup] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
 
+  // Hydration-safe data loading
   useEffect(() => {
     const profile = loadPetProfile()
     setPetProfile(profile)
-    setIsLoaded(true)
+    setIsHydrated(true)
   }, [])
 
   const handleProfileSave = (profile: PetProfile) => {
     savePetProfile(profile)
     setPetProfile(profile)
+    // Navigate to app after creating profile
+    router.push('/app')
   }
 
   const handleStart = () => {
@@ -40,16 +43,21 @@ export default function LandingPage() {
     setShowSetup(true)
   }
 
-  if (!isLoaded) {
+  // Show loading spinner during hydration
+  if (!isHydrated) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <main className="min-h-screen flex items-center justify-center bg-background">
+        <div 
+          className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"
+          role="status"
+          aria-label="Loading"
+        />
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <main className="min-h-screen flex flex-col bg-background">
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         {/* Logo/Icon */}
@@ -59,21 +67,23 @@ export default function LandingPage() {
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15 }}
         >
-          <div className="w-28 h-28 rounded-3xl bg-primary/10 flex items-center justify-center">
+          <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg">
             <motion.span 
               className="text-6xl"
               animate={{ rotate: [-5, 5, -5] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              role="img"
+              aria-label="Paw print"
             >
               🐾
             </motion.span>
           </div>
           <motion.div
-            className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary flex items-center justify-center"
-            animate={{ scale: [1, 1.1, 1] }}
+            className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md"
+            animate={{ scale: [1, 1.15, 1] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           >
-            <Sparkles className="w-4 h-4 text-primary-foreground" />
+            <Sparkles className="w-4 h-4 text-primary-foreground" aria-hidden="true" />
           </motion.div>
         </motion.div>
 
@@ -88,7 +98,7 @@ export default function LandingPage() {
         </motion.h1>
 
         <motion.p
-          className="text-lg text-muted-foreground text-center max-w-sm mb-8 text-pretty"
+          className="text-lg text-muted-foreground text-center max-w-sm mb-8 text-pretty leading-relaxed"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -102,14 +112,20 @@ export default function LandingPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
+          role="list"
+          aria-label="App features"
         >
           {[
-            { icon: <Mic className="w-5 h-5" />, text: 'Record any pet sound' },
-            { icon: <span className="text-lg">🎭</span>, text: 'Get dramatic translations' },
-            { icon: <span className="text-lg">📊</span>, text: 'See mood & intent analysis' },
+            { icon: <Mic className="w-5 h-5 text-primary" />, text: 'Record any pet sound' },
+            { icon: <Zap className="w-5 h-5 text-primary" />, text: 'Get dramatic translations' },
+            { icon: <BookOpen className="w-5 h-5 text-primary" />, text: 'Save to your pet diary' },
           ].map((feature, i) => (
-            <Card key={i} className="flex items-center gap-3 p-3">
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+            <Card 
+              key={i} 
+              className="flex items-center gap-3 p-4 hover:shadow-md transition-shadow"
+              role="listitem"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 {feature.icon}
               </div>
               <span className="text-sm font-medium text-foreground">{feature.text}</span>
@@ -145,11 +161,11 @@ export default function LandingPage() {
         >
           <Button 
             size="xl" 
-            className="w-full text-lg"
+            className="w-full text-lg shadow-lg hover:shadow-xl transition-shadow"
             onClick={handleStart}
           >
             {petProfile ? 'Start Translating' : 'Create Pet Profile'}
-            <ChevronRight className="w-5 h-5 ml-2" />
+            <ChevronRight className="w-5 h-5 ml-2" aria-hidden="true" />
           </Button>
           
           {!petProfile && (

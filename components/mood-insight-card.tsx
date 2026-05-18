@@ -14,7 +14,7 @@ interface MoodInsightCardProps {
   suggestedAction: string
 }
 
-const severityConfig = {
+const severityConfig: Record<Severity, { color: string; label: string }> = {
   low: { color: 'bg-accent text-accent-foreground', label: 'Low Priority' },
   medium: { color: 'bg-amber-100 text-amber-800', label: 'Medium Priority' },
   high: { color: 'bg-orange-100 text-orange-800', label: 'High Priority' },
@@ -42,16 +42,18 @@ export function MoodInsightCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3, duration: 0.4 }}
     >
-      <Card className="p-4">
+      <Card className="p-4" role="region" aria-labelledby="insights-title">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="font-semibold text-foreground">Translation Insights</h4>
+          <h4 id="insights-title" className="font-semibold text-foreground">
+            Translation Insights
+          </h4>
           <Badge className={severityStyle.color}>
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            {severityStyle.label}
+            <AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true" />
+            <span>{severityStyle.label}</span>
           </Badge>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-4" role="list" aria-label="Mood metrics">
           {insights.map((insight, index) => (
             <motion.div
               key={insight.label}
@@ -59,10 +61,11 @@ export function MoodInsightCard({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4 + index * 0.1 }}
+              role="listitem"
             >
-              <insight.icon className="w-4 h-4 text-muted-foreground mb-1" />
+              <insight.icon className="w-4 h-4 text-muted-foreground mb-1" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">{insight.label}</span>
-              <span className="text-sm font-medium text-foreground text-center">
+              <span className="text-sm font-medium text-foreground text-center" aria-label={`${insight.label}: ${insight.value}`}>
                 {insight.value}
               </span>
             </motion.div>
@@ -74,8 +77,10 @@ export function MoodInsightCard({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
+          role="note"
+          aria-label={`Suggested action: ${suggestedAction}`}
         >
-          <Lightbulb className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+          <Lightbulb className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div>
             <span className="text-xs text-muted-foreground block mb-0.5">
               Suggested Action

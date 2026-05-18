@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Copy, Share2, Bookmark, RotateCcw } from 'lucide-react'
+import { Copy, Share2, Bookmark, RotateCcw, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
@@ -12,6 +12,7 @@ interface ShareCardProps {
   onSave: () => void
   onReset: () => void
   isSaved?: boolean
+  copyFeedback?: boolean
 }
 
 export function ShareCard({
@@ -21,6 +22,7 @@ export function ShareCard({
   onSave,
   onReset,
   isSaved = false,
+  copyFeedback = false,
 }: ShareCardProps) {
   const handleShare = async () => {
     if (navigator.share) {
@@ -30,7 +32,7 @@ export function ShareCard({
           text: message,
         })
       } catch {
-        // User cancelled or share failed
+        // User cancelled or share failed - fallback to copy
         onCopy()
       }
     } else {
@@ -48,17 +50,23 @@ export function ShareCard({
         <div className="grid grid-cols-3 gap-2">
           <Button
             variant="outline"
-            className="flex flex-col items-center gap-1 h-auto py-3"
+            className="flex flex-col items-center gap-1 h-auto py-3 relative"
             onClick={onCopy}
+            aria-label={copyFeedback ? "Copied to clipboard" : "Copy translation to clipboard"}
           >
-            <Copy className="w-4 h-4" />
-            <span className="text-xs">Copy</span>
+            {copyFeedback ? (
+              <Check className="w-4 h-4 text-green-600" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
+            <span className="text-xs">{copyFeedback ? 'Copied!' : 'Copy'}</span>
           </Button>
 
           <Button
             variant="outline"
             className="flex flex-col items-center gap-1 h-auto py-3"
             onClick={handleShare}
+            aria-label="Share translation"
           >
             <Share2 className="w-4 h-4" />
             <span className="text-xs">Share</span>
@@ -69,6 +77,7 @@ export function ShareCard({
             className="flex flex-col items-center gap-1 h-auto py-3"
             onClick={onSave}
             disabled={isSaved}
+            aria-label={isSaved ? "Translation saved to diary" : "Save translation to diary"}
           >
             <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
             <span className="text-xs">{isSaved ? 'Saved' : 'Save'}</span>
@@ -79,6 +88,7 @@ export function ShareCard({
           variant="default"
           className="w-full mt-3"
           onClick={onReset}
+          aria-label="Record another pet sound"
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           Translate Another Sound

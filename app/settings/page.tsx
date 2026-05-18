@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { ChevronLeft, Home, BookOpen, Settings, Edit3, Trash2, Info } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, Home, BookOpen, Settings, Edit3, Trash2, Info, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PetProfileCard } from '@/components/pet-profile-card'
@@ -19,14 +19,15 @@ export default function SettingsPage() {
   const [petProfile, setPetProfile] = useState<PetProfile | null>(null)
   const [showProfileSetup, setShowProfileSetup] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   const agora = useAgoraVoice()
 
+  // Hydration-safe data loading
   useEffect(() => {
     const profile = loadPetProfile()
     setPetProfile(profile)
-    setIsLoaded(true)
+    setIsHydrated(true)
   }, [])
 
   const handleProfileSave = (profile: PetProfile) => {
@@ -45,29 +46,39 @@ export default function SettingsPage() {
     if (agora.error) return 'error'
     if (!agora.isAgoraConfigured) return 'demo-mode'
     if (agora.isConnected) return 'connected'
+    if (agora.isConnecting) return 'connecting'
     return 'missing-credentials'
   }
 
-  if (!isLoaded) {
+  if (!isHydrated) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <main className="min-h-screen flex items-center justify-center bg-background">
+        <div 
+          className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"
+          role="status"
+          aria-label="Loading settings"
+        />
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen flex flex-col pb-20">
+    <main className="min-h-screen flex flex-col pb-20 bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => router.back()}
+            aria-label="Go back"
+          >
             <ChevronLeft className="w-5 h-5" />
           </Button>
           
           <h1 className="font-semibold text-foreground">Settings</h1>
           
-          <div className="w-10" /> {/* Spacer */}
+          <div className="w-10" aria-hidden="true" />
         </div>
       </header>
 
@@ -77,8 +88,9 @@ export default function SettingsPage() {
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          aria-labelledby="pet-profile-heading"
         >
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
+          <h2 id="pet-profile-heading" className="text-sm font-medium text-muted-foreground mb-3 px-1">
             Pet Profile
           </h2>
           
@@ -94,16 +106,18 @@ export default function SettingsPage() {
                   variant="outline"
                   className="flex-1"
                   onClick={() => setShowProfileSetup(true)}
+                  aria-label={`Edit ${petProfile.name}'s profile`}
                 >
-                  <Edit3 className="w-4 h-4 mr-2" />
+                  <Edit3 className="w-4 h-4 mr-2" aria-hidden="true" />
                   Edit Profile
                 </Button>
                 <Button
                   variant="outline"
                   className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   onClick={() => setShowDeleteConfirm(true)}
+                  aria-label="Delete pet profile"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
             </div>
@@ -122,8 +136,9 @@ export default function SettingsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
+          aria-labelledby="connection-heading"
         >
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
+          <h2 id="connection-heading" className="text-sm font-medium text-muted-foreground mb-3 px-1">
             Connection Status
           </h2>
           
@@ -143,14 +158,14 @@ export default function SettingsPage() {
             
             <div className="bg-secondary/50 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Demo Mode uses simulated audio so you can test the experience 
                   without Agora credentials. To enable real voice recording, 
                   set the following environment variables:
                 </p>
               </div>
-              <div className="mt-3 space-y-1">
+              <div className="mt-3 space-y-1" aria-label="Required environment variables">
                 <code className="block text-xs bg-background px-2 py-1 rounded font-mono text-foreground">
                   NEXT_PUBLIC_AGORA_APP_ID
                 </code>
@@ -170,8 +185,9 @@ export default function SettingsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          aria-labelledby="about-heading"
         >
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 px-1">
+          <h2 id="about-heading" className="text-sm font-medium text-muted-foreground mb-3 px-1">
             About
           </h2>
           
@@ -195,65 +211,82 @@ export default function SettingsPage() {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            onClick={e => e.stopPropagation()}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setShowDeleteConfirm(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
           >
-            <Card className="p-6 max-w-sm">
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Delete Profile?
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                This will permanently delete your pet profile and all saved 
-                translations. This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={handleDeleteProfile}
-                >
-                  Delete
-                </Button>
-              </div>
-            </Card>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <Card className="p-6 max-w-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-destructive" aria-hidden="true" />
+                  </div>
+                  <h3 id="delete-dialog-title" className="text-lg font-semibold text-foreground">
+                    Delete Profile?
+                  </h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  This will permanently delete your pet profile and all saved 
+                  translations. This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowDeleteConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={handleDeleteProfile}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t">
+      <nav 
+        className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t"
+        aria-label="Main navigation"
+      >
         <div className="flex items-center justify-around py-3 px-4 max-w-md mx-auto">
-          <Link href="/">
+          <Link href="/" aria-label="Home">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
-              <Home className="w-5 h-5" />
+              <Home className="w-5 h-5" aria-hidden="true" />
               <span className="text-xs">Home</span>
             </Button>
           </Link>
           
-          <Link href="/diary">
+          <Link href="/diary" aria-label="Translation diary">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
-              <BookOpen className="w-5 h-5" />
+              <BookOpen className="w-5 h-5" aria-hidden="true" />
               <span className="text-xs">Diary</span>
             </Button>
           </Link>
           
-          <Link href="/settings">
+          <Link href="/settings" aria-current="page" aria-label="Settings (current page)">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 text-primary">
-              <Settings className="w-5 h-5" />
+              <Settings className="w-5 h-5" aria-hidden="true" />
               <span className="text-xs">Settings</span>
             </Button>
           </Link>

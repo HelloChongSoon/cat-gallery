@@ -22,37 +22,64 @@ export function useMockVoice(): UseMockVoiceReturn {
   const [volumeLevel, setVolumeLevel] = useState(0)
   const [recordingDuration, setRecordingDuration] = useState(0)
   
-  const volumeIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const volumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number>(0)
+  const isMountedRef = useRef(true)
 
-  // Cleanup on unmount
+  // Track mounted state for cleanup
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
+      isMountedRef.current = false
       if (volumeIntervalRef.current) clearInterval(volumeIntervalRef.current)
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current)
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
   }, [])
 
   const startRecording = useCallback(() => {
+    if (!isMountedRef.current) return
+    
     setIsRecording(true)
     setRecordingDuration(0)
+    startTimeRef.current = performance.now()
     
-    // Simulate varying volume levels for waveform animation
-    volumeIntervalRef.current = setInterval(() => {
-      // Generate natural-looking volume fluctuations
-      const baseLevel = 0.3 + Math.random() * 0.4
-      const spike = Math.random() > 0.7 ? Math.random() * 0.3 : 0
-      setVolumeLevel(Math.min(baseLevel + spike, 1))
-    }, 100)
+    // Use requestAnimationFrame for smooth waveform animation
+    const animateVolume = () => {
+      if (!isMountedRef.current) return
+      
+      const elapsed = performance.now() - startTimeRef.current
+      // Create natural-looking volume fluctuations using sine waves
+      const baseLevel = 0.35 + Math.sin(elapsed / 200) * 0.15
+      const mediumWave = Math.sin(elapsed / 80) * 0.12
+      const fastWave = Math.sin(elapsed / 30) * 0.08
+      const spike = Math.random() > 0.85 ? Math.random() * 0.2 : 0
+      
+      const newLevel = Math.max(0.1, Math.min(1, baseLevel + mediumWave + fastWave + spike))
+      setVolumeLevel(newLevel)
+      
+      animationFrameRef.current = requestAnimationFrame(animateVolume)
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(animateVolume)
 
     // Track recording duration
     durationIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 100)
+      if (isMountedRef.current) {
+        setRecordingDuration(prev => prev + 100)
+      }
     }, 100)
   }, [])
 
   const stopRecording = useCallback(() => {
     setIsRecording(false)
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
     
     if (volumeIntervalRef.current) {
       clearInterval(volumeIntervalRef.current)

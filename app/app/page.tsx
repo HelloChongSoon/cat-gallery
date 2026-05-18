@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, BookOpen, Home, Play, Info } from 'lucide-react'
+import { Settings, BookOpen, Home, Play, Info, AlertCircle, Mic } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -30,7 +30,12 @@ export default function AppPage() {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle')
   const [translation, setTranslation] = useState<TranslationResult | null>(null)
   const [isSaved, setIsSaved] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState(false)
+  
+  // Track if component is mounted
+  const isMountedRef = useRef(true)
+  const sessionStartedRef = useRef(false)
 
   // Agora voice hook
   const agora = useAgoraVoice()
@@ -41,6 +46,7 @@ export default function AppPage() {
   // Determine if we're in demo mode
   const isDemoMode = !agora.isAgoraConfigured
 
+  // Hydration effect - load profile from localStorage
   useEffect(() => {
     const profile = loadPetProfile()
     if (!profile) {
@@ -48,25 +54,42 @@ export default function AppPage() {
       return
     }
     setPetProfile(profile)
-    setIsLoaded(true)
+    setIsHydrated(true)
     
-    // Initialize Agora session if configured
-    if (agora.isAgoraConfigured) {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [router])
+
+  // Initialize Agora session when profile is loaded
+  useEffect(() => {
+    if (!isHydrated || !petProfile || sessionStartedRef.current) return
+    
+    if (agora.isAgoraConfigured && !agora.isConnected && !agora.isConnecting) {
+      sessionStartedRef.current = true
       agora.startSession()
     }
     
     return () => {
-      if (agora.isConnected) {
+      // Only cleanup on unmount, not on re-renders
+      if (!isMountedRef.current && agora.isConnected) {
         agora.stopSession()
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated, petProfile, agora])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      sessionStartedRef.current = false
+    }
   }, [])
 
-  const handleProfileSave = (profile: PetProfile) => {
+  const handleProfileSave = useCallback((profile: PetProfile) => {
     savePetProfile(profile)
     setPetProfile(profile)
-  }
+  }, [])
 
   const handleRecordStart = useCallback(() => {
     if (!petProfile) return
@@ -83,7 +106,7 @@ export default function AppPage() {
   }, [petProfile, isDemoMode, mock, agora])
 
   const handleRecordStop = useCallback(async () => {
-    if (!petProfile) return
+    if (!petProfile || !isMountedRef.current) return
 
     if (isDemoMode) {
       mock.stopRecording()
@@ -94,7 +117,9 @@ export default function AppPage() {
     setRecordingState('translating')
 
     // Simulate translation processing
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    await new Promise(resolve => setTimeout(resolve, 2500))
+
+    if (!isMountedRef.current) return
 
     // Generate fake translation
     const result = generatePetTranslation(petProfile, petProfile.type)
@@ -109,9 +134,23 @@ export default function AppPage() {
     setRecordingState('result')
   }, [petProfile, isDemoMode, mock, agora])
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (translation) {
-      navigator.clipboard.writeText(translation.translatedMessage)
+      try {
+        await navigator.clipboard.writeText(translation.translatedMessage)
+        setCopyFeedback(true)
+        setTimeout(() => setCopyFeedback(false), 2000)
+      } catch {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = translation.translatedMessage
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        setCopyFeedback(true)
+        setTimeout(() => setCopyFeedback(false), 2000)
+      }
     }
   }, [translation])
 
@@ -129,50 +168,73 @@ export default function AppPage() {
   }, [])
 
   const handleDemoRecord = useCallback(() => {
-    if (!petProfile) return
+    if (!petProfile || recordingState !== 'idle') return
     
     handleRecordStart()
     
     // Auto-stop after 2 seconds for demo
     setTimeout(() => {
-      handleRecordStop()
+      if (isMountedRef.current) {
+        handleRecordStop()
+      }
     }, 2000)
-  }, [petProfile, handleRecordStart, handleRecordStop])
+  }, [petProfile, recordingState, handleRecordStart, handleRecordStop])
 
   // Get connection status
-  const getConnectionStatus = () => {
+  const getConnectionStatus = useCallback(() => {
     if (agora.error) return 'error'
     if (!agora.isAgoraConfigured) return 'demo-mode'
     if (agora.isConnected) return 'connected'
+    if (agora.isConnecting) return 'connecting'
     return 'missing-credentials'
-  }
+  }, [agora.error, agora.isAgoraConfigured, agora.isConnected, agora.isConnecting])
 
-  if (!isLoaded || !petProfile) {
+  // Handle microphone permission request
+  const handleRequestPermission = useCallback(async () => {
+    const granted = await agora.requestPermission()
+    if (granted && agora.isAgoraConfigured && !agora.isConnected) {
+      await agora.startSession()
+    }
+  }, [agora])
+
+  // Loading state during hydration
+  if (!isHydrated || !petProfile) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <main className="min-h-screen flex items-center justify-center bg-background">
+        <div 
+          className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" 
+          role="status"
+          aria-label="Loading"
+        />
       </main>
     )
   }
 
+  const currentVolumeLevel = isDemoMode ? mock.volumeLevel : agora.volumeLevel
+  const isButtonDisabled = !isDemoMode && !agora.isConnected
+  const isConnecting = agora.isConnecting
+  const showPermissionPrompt = !isDemoMode && agora.permissionStatus === 'denied'
+
   return (
-    <main className="min-h-screen flex flex-col pb-20">
+    <main className="min-h-screen flex flex-col pb-20 bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center justify-between px-4 py-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon">
+          <Link href="/" aria-label="Go to home page">
+            <Button variant="ghost" size="icon" aria-label="Home">
               <Home className="w-5 h-5" />
             </Button>
           </Link>
           
           <div className="flex items-center gap-2">
-            <span className="text-2xl animate-bounce-soft">{petProfile.avatarEmoji}</span>
+            <span className="text-2xl" role="img" aria-label={`${petProfile.name} avatar`}>
+              {petProfile.avatarEmoji}
+            </span>
             <span className="font-semibold text-foreground">{petProfile.name}</span>
           </div>
           
-          <Link href="/settings">
-            <Button variant="ghost" size="icon">
+          <Link href="/settings" aria-label="Go to settings">
+            <Button variant="ghost" size="icon" aria-label="Settings">
               <Settings className="w-5 h-5" />
             </Button>
           </Link>
@@ -199,6 +261,30 @@ export default function AppPage() {
                 />
               </div>
 
+              {/* Permission Denied Warning */}
+              {showPermissionPrompt && (
+                <Card className="w-full max-w-sm mb-6 p-4 border-destructive/50 bg-destructive/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-1">Microphone Access Denied</p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Please enable microphone access in your browser settings to use voice recording.
+                      </p>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleRequestPermission}
+                        className="text-xs"
+                      >
+                        <Mic className="w-3 h-3 mr-1" />
+                        Try Again
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Demo Mode Info */}
               {isDemoMode && (
                 <Card className="w-full max-w-sm mb-6 p-4">
@@ -218,7 +304,7 @@ export default function AppPage() {
               {/* Waveform Preview */}
               <div className="w-full max-w-sm mb-8">
                 <WaveformVisualizer 
-                  volumeLevel={isDemoMode ? mock.volumeLevel : agora.volumeLevel} 
+                  volumeLevel={currentVolumeLevel} 
                   isActive={false}
                 />
               </div>
@@ -227,9 +313,10 @@ export default function AppPage() {
               <div className="mb-16">
                 <VoiceRecorderButton
                   isRecording={false}
+                  isLoading={isConnecting}
                   onRecordStart={handleRecordStart}
                   onRecordStop={handleRecordStop}
-                  isDisabled={!isDemoMode && !agora.isConnected}
+                  isDisabled={isButtonDisabled && !isDemoMode}
                 />
               </div>
 
@@ -239,9 +326,10 @@ export default function AppPage() {
                   variant="outline"
                   className="gap-2"
                   onClick={handleDemoRecord}
+                  aria-label="Try demo recording with simulated pet sounds"
                 >
                   <Play className="w-4 h-4" />
-                  Use Demo Meow
+                  Try Demo
                 </Button>
               )}
             </motion.div>
@@ -263,7 +351,7 @@ export default function AppPage() {
               {/* Active Waveform */}
               <div className="w-full max-w-sm mb-8">
                 <WaveformVisualizer 
-                  volumeLevel={isDemoMode ? mock.volumeLevel : agora.volumeLevel} 
+                  volumeLevel={currentVolumeLevel} 
                   isActive={true}
                 />
               </div>
@@ -273,7 +361,7 @@ export default function AppPage() {
                 isRecording={true}
                 onRecordStart={handleRecordStart}
                 onRecordStop={handleRecordStop}
-                volumeLevel={isDemoMode ? mock.volumeLevel : agora.volumeLevel}
+                volumeLevel={currentVolumeLevel}
               />
             </motion.div>
           )}
@@ -331,6 +419,7 @@ export default function AppPage() {
                 onSave={handleSave}
                 onReset={handleReset}
                 isSaved={isSaved}
+                copyFeedback={copyFeedback}
               />
             </motion.div>
           )}
@@ -338,23 +427,26 @@ export default function AppPage() {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t">
+      <nav 
+        className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t"
+        aria-label="Main navigation"
+      >
         <div className="flex items-center justify-around py-3 px-4 max-w-md mx-auto">
-          <Link href="/">
+          <Link href="/" aria-label="Home">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
               <Home className="w-5 h-5" />
               <span className="text-xs">Home</span>
             </Button>
           </Link>
           
-          <Link href="/diary">
+          <Link href="/diary" aria-label="Translation diary">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
               <BookOpen className="w-5 h-5" />
               <span className="text-xs">Diary</span>
             </Button>
           </Link>
           
-          <Link href="/settings">
+          <Link href="/settings" aria-label="Settings">
             <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2">
               <Settings className="w-5 h-5" />
               <span className="text-xs">Settings</span>

@@ -30,6 +30,8 @@ export function PetChatBubble({
         damping: 25,
         delay: 0.1 
       }}
+      role="article"
+      aria-label={`${petName} says: ${message}`}
     >
       {/* Avatar */}
       <motion.div 
@@ -37,6 +39,8 @@ export function PetChatBubble({
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 500, damping: 25 }}
+        role="img"
+        aria-label={`${petName}'s avatar`}
       >
         {avatarEmoji}
       </motion.div>
@@ -46,7 +50,7 @@ export function PetChatBubble({
         "flex flex-col gap-1",
         isUser ? "items-end" : "items-start"
       )}>
-        <span className="text-xs text-muted-foreground px-2">
+        <span className="text-xs text-muted-foreground px-2" aria-hidden="true">
           {petName}
         </span>
         <motion.div
