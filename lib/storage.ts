@@ -8,6 +8,9 @@ import type {
   CatProfile, 
   CatRoutine, 
   MeowLogEntry, 
+  MeowSound,
+  MoodCategory,
+  LikelyNeed,
   FeedbackAccuracy,
   ActionThatHelped 
 } from './types'
@@ -59,7 +62,15 @@ export function loadCatProfile(): CatProfile | null {
     if (!stored) return null
     const parsed = JSON.parse(stored)
     if (parsed && typeof parsed.id === 'string' && typeof parsed.name === 'string') {
-      return parsed as CatProfile
+      return {
+        id: parsed.id,
+        name: parsed.name,
+        personality: parsed.personality || 'vocal',
+        ageGroup: parsed.ageGroup || 'adult',
+        avatarEmoji: parsed.avatarEmoji || '🐱',
+        photoUrl: parsed.photoUrl,
+        healthNotes: parsed.healthNotes,
+      } as CatProfile
     }
     return null
   } catch {
@@ -142,11 +153,66 @@ export function loadMeowLogs(): MeowLogEntry[] {
     if (!stored) return []
     const parsed = JSON.parse(stored)
     if (Array.isArray(parsed)) {
-      return parsed as MeowLogEntry[]
+      return parsed
+        .map(normalizeMeowLog)
+        .filter((entry): entry is MeowLogEntry => Boolean(entry))
     }
     return []
   } catch {
     return []
+  }
+}
+
+function normalizeMeowLog(value: unknown): MeowLogEntry | null {
+  if (!value || typeof value !== 'object') return null
+
+  const raw = value as Record<string, any>
+  const createdAt = typeof raw.createdAt === 'string'
+    ? raw.createdAt
+    : typeof raw.timestamp === 'string'
+      ? raw.timestamp
+      : new Date().toISOString()
+
+  const soundObject = typeof raw.sound === 'object' && raw.sound
+    ? raw.sound as Record<string, unknown>
+    : null
+
+  const soundType = (soundObject?.soundType || raw.sound || 'short-meow') as MeowSound
+  const perceivedIntensity = (soundObject?.perceivedIntensity || 'medium') as MeowLogEntry['sound']['perceivedIntensity']
+  const context = typeof raw.context === 'object' && raw.context ? raw.context as Record<string, any> : {}
+  const situation = context.situation || context.situations?.[0] || 'other'
+  const interpretation = typeof raw.interpretation === 'object' && raw.interpretation ? raw.interpretation as Record<string, any> : {}
+  const likelyNeed = (interpretation.likelyNeed || 'unknown') as LikelyNeed
+  const mood = (interpretation.mood || 'attention') as MoodCategory
+  const playfulTranslation = String(interpretation.playfulTranslation || 'I need a little help decoding this one.')
+
+  return {
+    id: String(raw.id || generateId()),
+    catId: String(raw.catId || raw.petId || 'cat'),
+    createdAt,
+    timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : createdAt,
+    sound: {
+      soundType,
+      perceivedIntensity,
+    },
+    context: {
+      location: context.location || 'other',
+      situation,
+      situations: Array.isArray(context.situations) && context.situations.length ? context.situations : [situation],
+      notes: typeof context.notes === 'string' ? context.notes : undefined,
+    },
+    interpretation: {
+      headline: String(interpretation.headline || interpretation.suggestedAction || 'Check what changed nearby.'),
+      playfulTranslation,
+      likelyNeed,
+      confidence: Number(interpretation.confidence || 60),
+      urgency: interpretation.urgency || 'low',
+      mood,
+      reasoningSummary: String(interpretation.reasoningSummary || playfulTranslation),
+      suggestedAction: String(interpretation.suggestedAction || 'Offer attention, check basics, and watch for repeated signals.'),
+      possibleTrigger: typeof interpretation.possibleTrigger === 'string' ? interpretation.possibleTrigger : undefined,
+    },
+    feedback: raw.feedback || null,
   }
 }
 

@@ -1,0 +1,12 @@
+.DS_Store
+.next
+node_modules
+cat-gallery
+data
+dist
+pagebuilder
+repo
+scripts
+site
+supabase
+Wildflowers

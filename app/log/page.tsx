@@ -59,6 +59,10 @@ function formatDate(dateString: string): string {
   })
 }
 
+function formatLabel(value: string): string {
+  return value.replace(/[-_]/g, ' ')
+}
+
 function groupLogsByDate(logs: MeowLogEntry[]): Map<string, MeowLogEntry[]> {
   const groups = new Map<string, MeowLogEntry[]>()
   
@@ -121,7 +125,7 @@ export default function MeowLogPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col pb-20 bg-background">
+    <main className="min-h-screen flex flex-col pb-24 bg-[radial-gradient(circle_at_top,#fff7ed_0%,#f8fafc_48%,#ffffff_100%)]">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center justify-between px-4 py-3">
@@ -160,10 +164,10 @@ export default function MeowLogPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-4 py-4">
+      <div className="flex-1 px-4 py-4 max-w-lg mx-auto w-full">
         {filteredLogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-white shadow-lg shadow-primary/10 flex items-center justify-center mb-4">
               <BookOpen className="w-8 h-8 text-muted-foreground" />
             </div>
             <h2 className="text-lg font-semibold text-foreground mb-2">No Meows Yet</h2>
@@ -194,7 +198,7 @@ export default function MeowLogPage() {
                       animate={{ opacity: 1, y: 0 }}
                     >
                       <Card 
-                        className="p-4 cursor-pointer hover:bg-secondary/50 transition-colors"
+                        className="p-4 cursor-pointer bg-white/90 shadow-sm shadow-primary/5 hover:shadow-md transition-all"
                         onClick={() => setSelectedLog(log)}
                       >
                         <div className="flex items-start justify-between">
@@ -301,13 +305,13 @@ export default function MeowLogPage() {
                   <p className="text-xs text-muted-foreground mb-2">Context</p>
                   <div className="flex flex-wrap gap-2">
                     <span className="px-2 py-1 bg-secondary rounded-full text-xs text-foreground">
-                      {selectedLog.sound.soundType.replace('_', ' ')}
+                      {formatLabel(selectedLog.sound.soundType)}
                     </span>
                     <span className="px-2 py-1 bg-secondary rounded-full text-xs text-foreground">
-                      {selectedLog.context.location.replace('_', ' ')}
+                      {formatLabel(selectedLog.context.location)}
                     </span>
                     <span className="px-2 py-1 bg-secondary rounded-full text-xs text-foreground">
-                      {selectedLog.context.situation.replace('_', ' ')}
+                      {formatLabel(selectedLog.context.situation)}
                     </span>
                     <span className="px-2 py-1 bg-secondary rounded-full text-xs text-foreground">
                       {selectedLog.sound.perceivedIntensity} intensity
@@ -325,7 +329,7 @@ export default function MeowLogPage() {
                       </span>
                       {selectedLog.feedback.actionThatHelped && (
                         <span className="px-2 py-1 bg-secondary rounded-full text-xs text-foreground capitalize">
-                          {selectedLog.feedback.actionThatHelped.replace('_', ' ')} helped
+                          {formatLabel(selectedLog.feedback.actionThatHelped)} helped
                         </span>
                       )}
                     </div>

@@ -1,5 +1,5 @@
 /**
- * PetChat AI - Agora Voice Hook (Production-Ready)
+ * What Meow? - Agora Voice Hook (Production-Ready)
  * 
  * SECURITY NOTES:
  * - Tokens are generated server-side via /api/agora/token
@@ -35,7 +35,7 @@ export interface UseAgoraVoiceReturn {
   connectionStatus: ConnectionStatus
   startSession: () => Promise<void>
   stopSession: () => Promise<void>
-  startRecording: () => Promise<void>
+  startRecording: () => Promise<boolean>
   stopRecording: () => Promise<void>
   toggleMic: () => Promise<void>
   error: string | null
@@ -87,23 +87,34 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
   const sessionIdRef = useRef<string | null>(null)
   const cleanupInProgressRef = useRef(false)
   const currentTokenInfoRef = useRef<TokenInfo | null>(null)
+  const connectionStatusRef = useRef<ConnectionStatus>('disconnected')
+  const mountedRef = useRef(true)
 
   const isConnected = connectionStatus === 'connected'
   const isConnecting = connectionStatus === 'connecting'
 
+  useEffect(() => {
+    connectionStatusRef.current = connectionStatus
+  }, [connectionStatus])
+
   // Check microphone permission status on mount
   useEffect(() => {
     if (typeof window === 'undefined') return
+    let permissionResult: { removeEventListener: (type: 'change', listener: () => void) => void } | null = null
+    let handlePermissionChange: (() => void) | null = null
 
     const checkPermission = async () => {
       try {
         if (navigator.permissions) {
           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName })
-          setPermissionStatus(result.state as PermissionStatus)
+          permissionResult = result
+          if (mountedRef.current) setPermissionStatus(result.state as PermissionStatus)
           
-          result.addEventListener('change', () => {
-            setPermissionStatus(result.state as PermissionStatus)
-          })
+          handlePermissionChange = () => {
+            if (mountedRef.current) setPermissionStatus(result.state as PermissionStatus)
+          }
+
+          result.addEventListener('change', handlePermissionChange)
         }
       } catch {
         // permissions API not supported
@@ -112,6 +123,12 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
     }
 
     checkPermission()
+
+    return () => {
+      if (permissionResult && handlePermissionChange) {
+        permissionResult.removeEventListener('change', handlePermissionChange)
+      }
+    }
   }, [])
 
   // Token expiry countdown
@@ -151,7 +168,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }))
         
         if (errorData.code === 'NOT_CONFIGURED') {
-          setIsAgoraConfigured(false)
+          if (mountedRef.current) setIsAgoraConfigured(false)
           return null
         }
         
@@ -159,23 +176,28 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       }
 
       const data: TokenInfo = await response.json()
-      setIsAgoraConfigured(true)
+      if (mountedRef.current) setIsAgoraConfigured(true)
       return data
 
     } catch (err) {
       console.error('[Agora] Token fetch error:', err)
+      if (mountedRef.current) setIsAgoraConfigured(false)
       return null
     }
   }, [])
 
   // Check Agora configuration on mount
   useEffect(() => {
+    mountedRef.current = true
     const checkConfiguration = async () => {
-      const channelName = 'petchat-demo'
+      const channelName = 'what-meow'
       await fetchToken(channelName)
     }
     
     checkConfiguration()
+    return () => {
+      mountedRef.current = false
+    }
   }, [fetchToken])
 
   // Renew token before expiry
@@ -294,12 +316,14 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       // Reset session
       sessionIdRef.current = null
       currentTokenInfoRef.current = null
-      setConnectionStatus('disconnected')
-      setIsRecording(false)
-      setVolumeLevel(0)
-      setIsMicMuted(false)
-      setTokenInfo(null)
-      setTokenExpiresIn(null)
+      if (mountedRef.current) {
+        setConnectionStatus('disconnected')
+        setIsRecording(false)
+        setVolumeLevel(0)
+        setIsMicMuted(false)
+        setTokenInfo(null)
+        setTokenExpiresIn(null)
+      }
 
     } finally {
       cleanupInProgressRef.current = false
@@ -319,6 +343,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       // Immediately stop the stream - we just wanted to request permission
       stream.getTracks().forEach(track => track.stop())
       setPermissionStatus('granted')
+      setError(null)
       return true
     } catch (err) {
       if (err instanceof Error) {
@@ -337,7 +362,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
 
   const startSession = useCallback(async () => {
     // Guard: already connected or connecting
-    if (connectionStatus === 'connected' || connectionStatus === 'connecting') {
+    if (connectionStatusRef.current === 'connected' || connectionStatusRef.current === 'connecting') {
       return
     }
 
@@ -350,7 +375,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       setError(null)
 
       // Fetch token from server API
-      const channelName = 'petchat-demo' // Default channel name
+      const channelName = 'what-meow'
       const tokenData = await fetchToken(channelName)
 
       // Check if session was cancelled during fetch
@@ -360,8 +385,8 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
 
       // If no token (server not configured), fall back to demo mode
       if (!tokenData) {
-        setConnectionStatus('error')
-        setError('Agora not configured on server. Running in Demo Mode.')
+        setConnectionStatus('disconnected')
+        setError(null)
         return
       }
 
@@ -450,10 +475,30 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
 
     } catch (err) {
       // Reset on error
+      if (volumeIntervalRef.current) {
+        clearInterval(volumeIntervalRef.current)
+        volumeIntervalRef.current = null
+      }
+      const localTrack = localAudioTrackRef.current as {
+        stop?: () => void
+        close?: () => void
+      } | null
+      if (localTrack) {
+        try {
+          localTrack.stop?.()
+          localTrack.close?.()
+        } catch {
+          // Ignore cleanup after failed session start.
+        }
+      }
+      localAudioTrackRef.current = null
+      isPublishedRef.current = false
       clientRef.current = null
       sessionIdRef.current = null
       currentTokenInfoRef.current = null
       setConnectionStatus('error')
+      setIsRecording(false)
+      setVolumeLevel(0)
       setTokenInfo(null)
 
       // User-friendly error messages
@@ -480,7 +525,7 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         setError('Failed to connect. Please try again.')
       }
     }
-  }, [connectionStatus, fetchToken, renewToken, scheduleTokenRenewal])
+  }, [fetchToken, renewToken, scheduleTokenRenewal])
 
   const stopSession = useCallback(async () => {
     sessionIdRef.current = null
@@ -497,12 +542,12 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
     // Guard: not connected
     if (!client || connectionStatus !== 'connected') {
       setError('Not connected to Agora. Please wait for connection.')
-      return
+      return false
     }
 
     // Guard: already recording
     if (localAudioTrackRef.current) {
-      return
+      return true
     }
 
     try {
@@ -531,9 +576,27 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         }
       }, 100)
 
+      return true
+
     } catch (err) {
+      const failedTrack = localAudioTrackRef.current as {
+        stop?: () => void
+        close?: () => void
+      } | null
+
+      if (failedTrack) {
+        try {
+          failedTrack.stop?.()
+          failedTrack.close?.()
+        } catch {
+          // Ignore cleanup errors after failed track creation.
+        }
+      }
+
       localAudioTrackRef.current = null
       isPublishedRef.current = false
+      setIsRecording(false)
+      setVolumeLevel(0)
 
       if (err instanceof Error) {
         const message = err.message.toLowerCase()
@@ -553,6 +616,8 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       } else {
         setError('Failed to start recording. Please try again.')
       }
+
+      return false
     }
   }, [connectionStatus])
 

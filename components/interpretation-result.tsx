@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { RotateCcw, Save } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, HeartPulse, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,36 +20,58 @@ export function InterpretationResult({
   onSave,
   onNewRecording,
 }: InterpretationResultProps) {
+  const urgencyTone = interpretation.urgency === 'high'
+    ? 'border-destructive/30 bg-destructive/5'
+    : interpretation.urgency === 'medium'
+      ? 'border-amber-300 bg-amber-50'
+      : 'border-green-200 bg-green-50'
+  const UrgencyIcon = interpretation.urgency === 'high' ? AlertTriangle : interpretation.urgency === 'medium' ? HeartPulse : CheckCircle2
+
   return (
-    <Card className="p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground">{catName} might need</p>
-          <h2 className="text-lg font-semibold capitalize">
-            {interpretation.likelyNeed.replace('_', ' ')}
-          </h2>
+    <Card className="overflow-hidden border-primary/10 bg-white/90 shadow-xl shadow-primary/10">
+      <div className={`border-b p-5 ${urgencyTone}`}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/80">
+              <UrgencyIcon className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{catName} might need</p>
+              <h2 className="truncate text-lg font-bold capitalize text-foreground">
+                {interpretation.likelyNeed.replace('_', ' ')}
+              </h2>
+            </div>
+          </div>
+          <Badge variant={interpretation.urgency === 'high' ? 'destructive' : 'secondary'}>
+            {interpretation.confidence}% sure
+          </Badge>
         </div>
-        <Badge variant={interpretation.urgency === 'high' ? 'destructive' : 'secondary'}>
-          {interpretation.confidence}% sure
-        </Badge>
+        <p className="text-sm font-medium leading-relaxed text-foreground">
+          {interpretation.headline}
+        </p>
       </div>
 
-      <blockquote className="mb-4 rounded-xl bg-primary/5 p-4 text-sm italic text-foreground">
+      <div className="p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Playful read</p>
+      </div>
+
+      <blockquote className="mb-4 rounded-xl bg-primary/5 p-4 text-sm italic leading-relaxed text-foreground">
         “{interpretation.playfulTranslation}”
       </blockquote>
 
       <div className="space-y-3 text-sm">
         <div>
-          <p className="text-xs text-muted-foreground">Reasoning</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why this read</p>
           <p>{interpretation.reasoningSummary}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Suggested Action</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Try now</p>
           <p>{interpretation.suggestedAction}</p>
         </div>
         {interpretation.possibleTrigger && (
           <div>
-            <p className="text-xs text-muted-foreground">Possible Trigger</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Possible trigger</p>
             <p>{interpretation.possibleTrigger}</p>
           </div>
         )}
@@ -64,6 +86,7 @@ export function InterpretationResult({
           <RotateCcw className="h-4 w-4" />
           Again
         </Button>
+      </div>
       </div>
     </Card>
   )

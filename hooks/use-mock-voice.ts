@@ -1,5 +1,5 @@
 /**
- * PetChat AI - Mock Voice Recorder Hook
+ * What Meow? - Mock Voice Recorder Hook
  * 
  * Simulates voice recording for Demo Mode when Agora credentials are not available.
  * Provides the same interface as useAgoraVoice for seamless switching.
@@ -41,6 +41,16 @@ export function useMockVoice(): UseMockVoiceReturn {
 
   const startRecording = useCallback(() => {
     if (!isMountedRef.current) return
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current)
+      durationIntervalRef.current = null
+    }
     
     setIsRecording(true)
     setRecordingDuration(0)

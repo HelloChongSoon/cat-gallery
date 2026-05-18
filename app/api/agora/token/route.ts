@@ -1,5 +1,5 @@
 /**
- * PetChat AI - Agora Token Generation API
+ * What Meow? - Agora Token Generation API
  * 
  * SECURITY NOTES:
  * - AGORA_APP_CERTIFICATE must ONLY exist in server-side environment variables

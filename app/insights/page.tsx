@@ -47,6 +47,10 @@ const soundLabels: Record<MeowSound, string> = {
   'silent-meow': 'Silent Meow',
 }
 
+function formatLabel(value: string): string {
+  return value.replace(/[-_]/g, ' ')
+}
+
 export default function InsightsPage() {
   const router = useRouter()
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null)
@@ -172,7 +176,7 @@ export default function InsightsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff7ed_0%,#f8fafc_48%,#ffffff_100%)] flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -196,7 +200,7 @@ export default function InsightsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-12"
+            className="text-center py-12 rounded-3xl bg-white/70 shadow-sm shadow-primary/5 px-5"
           >
             <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
             <h2 className="text-lg font-medium text-foreground mb-2">
@@ -214,7 +218,7 @@ export default function InsightsPage() {
           <div className="space-y-6">
             {/* Quick Stats */}
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4">
+              <Card className="p-4 bg-white/90 shadow-sm shadow-primary/5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Calendar className="w-5 h-5 text-primary" />
@@ -227,7 +231,7 @@ export default function InsightsPage() {
               </Card>
               
               {insights.accuracyRate !== null && (
-                <Card className="p-4">
+                <Card className="p-4 bg-white/90 shadow-sm shadow-primary/5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                       <TrendingUp className="w-5 h-5 text-green-600" />
@@ -242,7 +246,7 @@ export default function InsightsPage() {
             </div>
 
             {/* Peak Activity Times */}
-            <Card>
+            <Card className="bg-white/90 shadow-sm shadow-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Clock className="w-4 h-4" />
@@ -278,7 +282,7 @@ export default function InsightsPage() {
             </Card>
 
             {/* Dominant Mood */}
-            <Card>
+            <Card className="bg-white/90 shadow-sm shadow-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Heart className="w-4 h-4" />
@@ -332,7 +336,7 @@ export default function InsightsPage() {
             </Card>
 
             {/* Sound Types */}
-            <Card>
+            <Card className="bg-white/90 shadow-sm shadow-primary/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Mic className="w-4 h-4" />
@@ -362,7 +366,7 @@ export default function InsightsPage() {
 
             {/* Common Contexts */}
             {insights.topContexts.length > 0 && (
-              <Card>
+              <Card className="bg-white/90 shadow-sm shadow-primary/5">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Activity className="w-4 h-4" />
@@ -376,7 +380,7 @@ export default function InsightsPage() {
                   <div className="flex flex-wrap gap-2">
                     {insights.topContexts.map(context => (
                       <Badge key={context} variant="outline" className="capitalize">
-                        {context.replace(/-/g, ' ')}
+                        {formatLabel(context)}
                       </Badge>
                     ))}
                   </div>

@@ -74,10 +74,10 @@ export default function GalleryPage() {
           <Link 
             href="/"
             className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
-            aria-label="Back to PetChat"
+            aria-label="Back to What Meow?"
           >
             <Home className="w-5 h-5" />
-            <span className="text-sm hidden sm:inline">PetChat</span>
+            <span className="text-sm hidden sm:inline">What Meow?</span>
           </Link>
           
           <h1 className="text-xl sm:text-2xl font-semibold">

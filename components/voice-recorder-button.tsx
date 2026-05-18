@@ -9,8 +9,8 @@ interface VoiceRecorderButtonProps {
   isRecording: boolean
   isDisabled?: boolean
   isLoading?: boolean
-  onRecordStart: () => void
-  onRecordStop: () => void
+  onRecordStart: () => void | Promise<void>
+  onRecordStop: () => void | Promise<void>
   volumeLevel?: number
 }
 
@@ -40,7 +40,7 @@ export function VoiceRecorderButton({
     // Small delay to prevent accidental taps
     holdTimeout.current = setTimeout(() => {
       if (isHoldingRef.current) {
-        onRecordStart()
+        void onRecordStart()
       }
     }, 100)
   }, [isDisabled, isLoading, onRecordStart])
@@ -50,7 +50,7 @@ export function VoiceRecorderButton({
     cleanup()
     
     if (isRecording) {
-      onRecordStop()
+      void onRecordStop()
     }
   }, [isRecording, onRecordStop, cleanup])
 
@@ -59,7 +59,7 @@ export function VoiceRecorderButton({
     cleanup()
     
     if (isRecording) {
-      onRecordStop()
+      void onRecordStop()
     }
   }, [isRecording, onRecordStop, cleanup])
 

@@ -14,31 +14,6 @@ export type CatPersonality =
 
 export type CatAgeGroup = 'kitten' | 'adult' | 'senior'
 
-export type PetType = 'cat' | 'dog' | 'human' | 'mystery'
-export type PetPersonality = 'dramatic' | 'royal' | 'chaotic' | 'sweet' | 'judgy'
-export type Severity = 'low' | 'medium' | 'high' | 'royal emergency'
-
-export interface PetProfile {
-  id: string
-  name: string
-  type: PetType
-  personality: PetPersonality
-  avatarEmoji: string
-}
-
-export interface TranslationResult {
-  id: string
-  petId: string
-  createdAt: string
-  originalSoundType: PetType
-  translatedMessage: string
-  mood: string
-  intent: string
-  confidence: number
-  severity: Severity
-  suggestedAction: string
-}
-
 export interface CatProfile {
   id: string
   name: string
@@ -120,6 +95,7 @@ export interface MeowSoundDetails {
 }
 
 export interface CareInterpretation {
+  headline: string
   playfulTranslation: string
   likelyNeed: LikelyNeed
   confidence: number

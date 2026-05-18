@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Sparkles, ChevronRight, Mic, BookOpen, Zap, Cat } from 'lucide-react'
+import { Sparkles, ChevronRight, Mic, BookOpen, Heart, Cat } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -14,26 +14,26 @@ import type { CatProfile } from '@/lib/types'
 
 export default function LandingPage() {
   const router = useRouter()
-  const [petProfile, setPetProfile] = useState<CatProfile | null>(null)
+  const [catProfile, setCatProfile] = useState<CatProfile | null>(null)
   const [showSetup, setShowSetup] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
 
   // Hydration-safe data loading
   useEffect(() => {
     const profile = loadCatProfile()
-    setPetProfile(profile)
+    setCatProfile(profile)
     setIsHydrated(true)
   }, [])
 
   const handleProfileSave = (profile: CatProfile) => {
     saveCatProfile(profile)
-    setPetProfile(profile)
+    setCatProfile(profile)
     // Navigate to app after creating profile
     router.push('/app')
   }
 
   const handleStart = () => {
-    if (petProfile) {
+    if (catProfile) {
       router.push('/app')
     } else {
       setShowSetup(true)
@@ -58,9 +58,9 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col bg-background">
+    <main className="min-h-screen flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#fff7ed_0%,#f8fafc_46%,#ffffff_100%)]">
       {/* Hero Section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
         {/* Logo/Icon */}
         <motion.div
           className="relative mb-8"
@@ -68,7 +68,7 @@ export default function LandingPage() {
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15 }}
         >
-          <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg">
+          <div className="w-28 h-28 rounded-[2rem] bg-white/80 ring-1 ring-primary/10 flex items-center justify-center shadow-xl shadow-primary/10">
             <motion.span 
               className="text-6xl"
               animate={{ rotate: [-5, 5, -5] }}
@@ -95,7 +95,7 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          PetChat AI
+          What Meow?
         </motion.h1>
 
         <motion.p
@@ -104,7 +104,7 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          Discover what your pet is really saying. Translate meows, barks, and mystery sounds into hilarious messages.
+          Decode your cat&apos;s meows into practical care clues, warm patterns, and just enough mischief to share.
         </motion.p>
 
         {/* Features */}
@@ -117,13 +117,13 @@ export default function LandingPage() {
           aria-label="App features"
         >
           {[
-            { icon: <Mic className="w-5 h-5 text-primary" />, text: 'Record any pet sound' },
-            { icon: <Zap className="w-5 h-5 text-primary" />, text: 'Get dramatic translations' },
-            { icon: <BookOpen className="w-5 h-5 text-primary" />, text: 'Save to your pet diary' },
+            { icon: <Mic className="w-5 h-5 text-primary" />, text: 'Capture a real or demo meow' },
+            { icon: <Heart className="w-5 h-5 text-primary" />, text: 'Get a useful care read first' },
+            { icon: <BookOpen className="w-5 h-5 text-primary" />, text: 'Build a living meow log' },
           ].map((feature, i) => (
             <Card 
               key={i} 
-              className="flex items-center gap-3 p-4 hover:shadow-md transition-shadow"
+              className="flex items-center gap-3 p-4 bg-white/80 shadow-sm shadow-primary/5 hover:shadow-md transition-shadow"
               role="listitem"
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -135,7 +135,7 @@ export default function LandingPage() {
         </motion.div>
 
         {/* Pet Profile Card (if exists) */}
-        {petProfile && (
+        {catProfile && (
           <motion.div
             className="w-full max-w-sm mb-6"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -146,7 +146,7 @@ export default function LandingPage() {
               Your Pet
             </p>
             <CatProfileCard 
-              profile={petProfile} 
+              profile={catProfile} 
               onEdit={handleEditProfile}
               size="md"
             />
@@ -165,13 +165,13 @@ export default function LandingPage() {
             className="w-full text-lg shadow-lg hover:shadow-xl transition-shadow"
             onClick={handleStart}
           >
-            {petProfile ? 'Start Translating' : 'Create Pet Profile'}
+            {catProfile ? 'Decode a Meow' : 'Create Cat Profile'}
             <ChevronRight className="w-5 h-5 ml-2" aria-hidden="true" />
           </Button>
           
-          {!petProfile && (
+          {!catProfile && (
             <p className="text-xs text-muted-foreground text-center mt-3">
-              No account needed. Your data stays on your device.
+              No account needed. Your cat&apos;s data stays on this device.
             </p>
           )}
         </motion.div>
@@ -187,7 +187,7 @@ export default function LandingPage() {
           <span>Bryson&apos;s Cat Gallery</span>
         </Link>
         <p className="text-xs text-muted-foreground">
-          Made with lots of treats and head scratches
+          Made for tiny mysteries and very serious snack negotiations
         </p>
       </footer>
 
@@ -196,7 +196,7 @@ export default function LandingPage() {
         isOpen={showSetup}
         onClose={() => setShowSetup(false)}
         onSave={handleProfileSave}
-        initialProfile={petProfile}
+        initialProfile={catProfile}
       />
     </main>
   )

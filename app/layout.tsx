@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "PetChat AI - Translate Your Pet",
-  description: "Turn your pet's sounds into hilarious translations. Record a meow, bark, or mystery noise and discover what your furry friend is really saying!",
+  title: "What Meow? - Decode Your Cat",
+  description: "Turn cat meows into practical care clues, warm logs, and shareable playful translations.",
   openGraph: {
-    title: "PetChat AI - Translate Your Pet",
-    description: "Turn your pet's sounds into hilarious translations",
+    title: "What Meow? - Decode Your Cat",
+    description: "Turn cat meows into useful, playful care reads.",
     type: "website",
   },
 }

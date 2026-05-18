@@ -46,6 +46,8 @@ export default function AppPage() {
   const [interpretation, setInterpretation] = useState<CareInterpretation | null>(null)
   const [currentLogEntry, setCurrentLogEntry] = useState<MeowLogEntry | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
+  const [recordingError, setRecordingError] = useState<string | null>(null)
+  const [isStartingRecording, setIsStartingRecording] = useState(false)
   
   const isMountedRef = useRef(true)
   const sessionStartedRef = useRef(false)
@@ -75,21 +77,31 @@ export default function AppPage() {
     }
   }, [router])
 
-  // Initialize Agora session
   useEffect(() => {
     if (!isHydrated || !catProfile || sessionStartedRef.current) return
-    
-    if (agora.isAgoraConfigured && !agora.isConnected && agora.connectionStatus !== 'connecting') {
-      sessionStartedRef.current = true
-      agora.startSession()
-    }
-    
-    return () => {
-      if (!isMountedRef.current && agora.isConnected) {
-        agora.stopSession()
+    if (!agora.isAgoraConfigured || agora.isConnected || agora.connectionStatus === 'connecting') return
+
+    sessionStartedRef.current = true
+    void agora.startSession().finally(() => {
+      if (agora.connectionStatus === 'error') {
+        sessionStartedRef.current = false
       }
+    })
+  }, [
+    isHydrated,
+    catProfile,
+    agora.isAgoraConfigured,
+    agora.isConnected,
+    agora.connectionStatus,
+    agora.startSession,
+  ])
+
+  useEffect(() => {
+    return () => {
+      mock.stopRecording()
+      void agora.stopSession()
     }
-  }, [isHydrated, catProfile, agora])
+  }, [agora.stopSession, mock.stopRecording])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -109,37 +121,59 @@ export default function AppPage() {
     return 'ready'
   }, [agora.isAgoraConfigured, agora.error, agora.connectionStatus])
 
-  const handleRecordStart = useCallback(() => {
+  const handleRecordStart = useCallback(async () => {
     if (!catProfile) return
-    
-    setRecordingState('listening')
+
+    setRecordingError(null)
+    setIsStartingRecording(true)
     setCurrentSound(null)
     setCurrentContext(null)
     setInterpretation(null)
     setCurrentLogEntry(null)
 
-    if (isDemoMode) {
-      mock.startRecording()
-    } else {
-      agora.startRecording()
+    try {
+      if (isDemoMode) {
+        mock.startRecording()
+        setRecordingState('listening')
+        return
+      }
+
+      const hasPermission = await agora.requestPermission()
+      if (!hasPermission) {
+        setRecordingError('Microphone access is blocked. Allow access or use Demo Mode.')
+        return
+      }
+
+      const started = await agora.startRecording()
+      if (started) {
+        setRecordingState('listening')
+      } else {
+        setRecordingError(agora.error || 'Could not start the microphone. Try again or use Demo Mode.')
+      }
+    } finally {
+      setIsStartingRecording(false)
     }
   }, [catProfile, isDemoMode, mock, agora])
 
   const handleRecordStop = useCallback(async () => {
     if (!catProfile || !isMountedRef.current) return
 
-    if (isDemoMode) {
-      mock.stopRecording()
-    } else {
-      await agora.stopRecording()
-    }
+    try {
+      if (isDemoMode) {
+        mock.stopRecording()
+      } else {
+        await agora.stopRecording()
+      }
 
-    // Move to context tagging
-    setRecordingState('context-tagging')
+      setRecordingState('context-tagging')
+    } catch {
+      setRecordingError('Recording stopped, but cleanup hit a problem. You can try again.')
+      setRecordingState('idle')
+    }
   }, [catProfile, isDemoMode, mock, agora])
 
   const handleContextComplete = useCallback((sound: MeowSoundDetails, context: MeowContext) => {
-    if (!catProfile || !catRoutine) return
+    if (!catProfile) return
 
     setCurrentSound(sound)
     setCurrentContext(context)
@@ -160,11 +194,13 @@ export default function AppPage() {
 
   const handleSaveToLog = useCallback(() => {
     if (!catProfile || !currentSound || !currentContext || !interpretation) return
+    const now = new Date().toISOString()
 
     const logEntry: MeowLogEntry = {
       id: generateId(),
       catId: catProfile.id,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      timestamp: now,
       sound: currentSound,
       context: currentContext,
       interpretation,
@@ -177,12 +213,16 @@ export default function AppPage() {
   }, [catProfile, currentSound, currentContext, interpretation])
 
   const handleReset = useCallback(() => {
+    mock.stopRecording()
+    void agora.stopRecording()
     setRecordingState('idle')
     setCurrentSound(null)
     setCurrentContext(null)
     setInterpretation(null)
     setCurrentLogEntry(null)
-  }, [])
+    setRecordingError(null)
+    setIsStartingRecording(false)
+  }, [agora.stopRecording, mock.stopRecording])
 
   const handleFeedbackSubmit = useCallback((accuracy: FeedbackAccuracy, action: ActionThatHelped | null) => {
     if (!currentLogEntry) return
@@ -219,11 +259,11 @@ export default function AppPage() {
 
   const currentVolumeLevel = isDemoMode ? mock.volumeLevel : agora.volumeLevel
   const isButtonDisabled = !isDemoMode && !agora.isConnected
-  const isConnecting = agora.connectionStatus === 'connecting'
+  const isConnecting = agora.connectionStatus === 'connecting' || isStartingRecording
   const showPermissionPrompt = !isDemoMode && agora.permissionStatus === 'denied'
 
   return (
-    <main className="min-h-screen flex flex-col pb-20 bg-background">
+    <main className="min-h-screen flex flex-col pb-24 bg-[radial-gradient(circle_at_top,#fff7ed_0%,#f8fafc_45%,#fff_100%)]">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
         <div className="flex items-center justify-between px-4 py-3">
@@ -268,15 +308,14 @@ export default function AppPage() {
                 />
               </div>
 
-              {/* Permission Denied Warning */}
-              {showPermissionPrompt && (
+              {(showPermissionPrompt || recordingError) && (
                 <Card className="w-full max-w-sm mb-6 p-4 border-destructive/50 bg-destructive/5">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-foreground mb-1">Microphone Access Denied</p>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Please enable microphone access in your browser settings.
+                        {recordingError || 'Please enable microphone access in your browser settings.'}
                       </p>
                       <Button 
                         size="sm" 
@@ -300,7 +339,7 @@ export default function AppPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground mb-1">Demo Mode</p>
                       <p className="text-xs text-muted-foreground">
-                        Try the experience with simulated meow sounds.
+                        Full experience is available with simulated meows while Agora is not configured.
                       </p>
                     </div>
                   </div>
@@ -309,11 +348,11 @@ export default function AppPage() {
 
               {/* Instructions */}
               <div className="text-center mb-8 max-w-sm">
-                <h2 className="text-lg font-semibold text-foreground mb-2">
-                  Ready to listen
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  What is {catProfile.name} trying to say?
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Hold the button while {catProfile.name} meows, then answer a few quick questions about the context.
+                  Hold to capture a meow, then add context so the result is useful before it gets funny.
                 </p>
               </div>
 
@@ -340,8 +379,9 @@ export default function AppPage() {
               {isDemoMode && (
                 <Button
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 rounded-full border-primary/30 bg-white/80 shadow-sm"
                   onClick={handleDemoRecord}
+                  disabled={recordingState !== 'idle' || isStartingRecording}
                 >
                   <Play className="w-4 h-4" />
                   Try Demo
