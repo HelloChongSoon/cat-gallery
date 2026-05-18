@@ -180,14 +180,15 @@ export default function AppPage() {
     }, 2000)
   }, [petProfile, recordingState, handleRecordStart, handleRecordStop])
 
-  // Get connection status
-  const getConnectionStatus = useCallback(() => {
-    if (agora.error) return 'error'
+  // Get connection status for badge display
+  const getConnectionStatus = useCallback((): 'connected' | 'connecting' | 'demo-mode' | 'missing-credentials' | 'error' => {
     if (!agora.isAgoraConfigured) return 'demo-mode'
-    if (agora.isConnected) return 'connected'
-    if (agora.isConnecting) return 'connecting'
+    if (agora.error) return 'error'
+    if (agora.connectionStatus === 'connected') return 'connected'
+    if (agora.connectionStatus === 'connecting') return 'connecting'
+    if (agora.connectionStatus === 'error') return 'error'
     return 'missing-credentials'
-  }, [agora.error, agora.isAgoraConfigured, agora.isConnected, agora.isConnecting])
+  }, [agora.isAgoraConfigured, agora.error, agora.connectionStatus])
 
   // Handle microphone permission request
   const handleRequestPermission = useCallback(async () => {
