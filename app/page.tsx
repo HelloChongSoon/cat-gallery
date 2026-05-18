@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Sparkles, ChevronRight, Mic, BookOpen, Zap } from 'lucide-react'
+import { Sparkles, ChevronRight, Mic, BookOpen, Zap, Cat } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PetProfileSetup } from '@/components/pet-profile-setup'
@@ -177,7 +178,14 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="py-6 text-center">
+      <footer className="py-6 text-center space-y-3">
+        <Link 
+          href="/gallery"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Cat className="w-4 h-4" />
+          <span>Bryson&apos;s Cat Gallery</span>
+        </Link>
         <p className="text-xs text-muted-foreground">
           Made with lots of treats and head scratches
         </p>
