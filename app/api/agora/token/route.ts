@@ -46,11 +46,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<TokenResp
     const appId = process.env.AGORA_APP_ID
     const appCertificate = process.env.AGORA_APP_CERTIFICATE
 
-    console.log('[v0] Agora Token API - appId exists:', !!appId, 'appCertificate exists:', !!appCertificate)
-
     // Check if Agora is configured on the server
     if (!appId || !appCertificate) {
-      console.log('[v0] Agora Token API - NOT_CONFIGURED')
       return NextResponse.json(
         { 
           error: 'Agora is not configured on the server. Running in Demo Mode.',

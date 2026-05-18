@@ -42,12 +42,13 @@ export default function SettingsPage() {
   }
 
   // Get connection status for badge display
-  const getConnectionStatus = (): 'connected' | 'connecting' | 'demo-mode' | 'missing-credentials' | 'error' => {
-    if (agora.error) return 'error'
+  const getConnectionStatus = (): 'connected' | 'connecting' | 'demo-mode' | 'ready' | 'error' => {
     if (!agora.isAgoraConfigured) return 'demo-mode'
+    if (agora.error) return 'error'
     if (agora.connectionStatus === 'connected') return 'connected'
     if (agora.connectionStatus === 'connecting') return 'connecting'
-    return 'demo-mode'
+    if (agora.connectionStatus === 'error') return 'error'
+    return 'ready'
   }
 
   if (!isHydrated) {

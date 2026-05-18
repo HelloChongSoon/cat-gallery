@@ -1,10 +1,10 @@
 'use client'
 
-import { Wifi, WifiOff, AlertCircle, PlayCircle, Loader2 } from 'lucide-react'
+import { Wifi, WifiOff, AlertCircle, PlayCircle, Loader2, CheckCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-type ConnectionStatus = 'connected' | 'connecting' | 'demo-mode' | 'missing-credentials' | 'error'
+type ConnectionStatus = 'connected' | 'connecting' | 'demo-mode' | 'ready' | 'error'
 
 interface ConnectionStatusBadgeProps {
   status: ConnectionStatus
@@ -30,10 +30,10 @@ const statusConfig = {
     variant: 'secondary' as const,
     className: '',
   },
-  'missing-credentials': {
-    icon: WifiOff,
-    label: 'No Credentials',
-    variant: 'warning' as const,
+  'ready': {
+    icon: CheckCircle,
+    label: 'Ready',
+    variant: 'success' as const,
     className: '',
   },
   error: {

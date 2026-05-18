@@ -140,7 +140,6 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
 
   // Fetch token from server API
   const fetchToken = useCallback(async (channelName: string, uid?: number): Promise<TokenInfo | null> => {
-    console.log('[v0] fetchToken called with channelName:', channelName)
     try {
       const response = await fetch('/api/agora/token', {
         method: 'POST',
@@ -148,11 +147,8 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
         body: JSON.stringify({ channelName, uid }),
       })
 
-      console.log('[v0] fetchToken response status:', response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }))
-        console.log('[v0] fetchToken error:', errorData)
         
         if (errorData.code === 'NOT_CONFIGURED') {
           setIsAgoraConfigured(false)
@@ -163,12 +159,11 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       }
 
       const data: TokenInfo = await response.json()
-      console.log('[v0] fetchToken success, token expires in:', data.expiresIn)
       setIsAgoraConfigured(true)
       return data
 
     } catch (err) {
-      console.error('[v0] Token fetch error:', err)
+      console.error('[Agora] Token fetch error:', err)
       return null
     }
   }, [])
@@ -176,11 +171,8 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
   // Check Agora configuration on mount
   useEffect(() => {
     const checkConfiguration = async () => {
-      console.log('[v0] Checking Agora configuration on mount...')
-      // Try to fetch a token for default channel to check if configured
       const channelName = 'petchat-demo'
-      const result = await fetchToken(channelName)
-      console.log('[v0] Configuration check result:', result ? 'configured' : 'not configured')
+      await fetchToken(channelName)
     }
     
     checkConfiguration()
