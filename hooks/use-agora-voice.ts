@@ -301,9 +301,13 @@ export function useAgoraVoice(): UseAgoraVoiceReturn {
       // User-friendly error messages
       if (err instanceof Error) {
         const message = err.message.toLowerCase()
+        const errorString = String(err)
         
-        if (message.includes('invalid token') || message.includes('token expired')) {
-          setError('Agora token is invalid or expired. Please generate a new token.')
+        // Check for gateway/token errors (CAN_NOT_GET_GATEWAY_SERVER)
+        if (message.includes('gateway') || message.includes('can_not_get_gateway') || errorString.includes('CAN_NOT_GET_GATEWAY')) {
+          setError('Agora token expired or invalid. Falling back to Demo Mode. Generate a new token at console.agora.io')
+        } else if (message.includes('invalid token') || message.includes('token expired') || message.includes('token')) {
+          setError('Agora token is invalid or expired. Please generate a new token at console.agora.io')
         } else if (message.includes('invalid appid') || message.includes('app id')) {
           setError('Invalid Agora App ID. Please check your credentials.')
         } else if (message.includes('channel')) {

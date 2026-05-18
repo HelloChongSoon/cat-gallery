@@ -43,8 +43,8 @@ export default function AppPage() {
   // Mock voice hook for demo mode
   const mock = useMockVoice()
 
-  // Determine if we're in demo mode
-  const isDemoMode = !agora.isAgoraConfigured
+  // Determine if we're in demo mode (not configured OR connection failed)
+  const isDemoMode = !agora.isAgoraConfigured || agora.connectionStatus === 'error'
 
   // Hydration effect - load profile from localStorage
   useEffect(() => {
@@ -294,8 +294,10 @@ export default function AppPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground mb-1">Demo Mode Active</p>
                       <p className="text-xs text-muted-foreground">
-                        Real voice recording requires Agora credentials. 
-                        Tap the demo button below to test with simulated audio.
+                        {agora.connectionStatus === 'error' 
+                          ? 'Agora connection failed. Using simulated audio for demo purposes.'
+                          : 'Real voice recording requires Agora credentials. Tap the demo button below to test with simulated audio.'
+                        }
                       </p>
                     </div>
                   </div>
