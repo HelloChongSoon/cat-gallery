@@ -7,26 +7,26 @@ import { Sparkles, ChevronRight, Mic, BookOpen, Zap, Cat } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { PetProfileSetup } from '@/components/pet-profile-setup'
-import { PetProfileCard } from '@/components/pet-profile-card'
-import { loadPetProfile, savePetProfile } from '@/lib/storage'
-import type { PetProfile } from '@/lib/types'
+import { CatProfileSetup } from '@/components/cat-profile-setup'
+import { CatProfileCard } from '@/components/cat-profile-card'
+import { loadCatProfile, saveCatProfile } from '@/lib/storage'
+import type { CatProfile } from '@/lib/types'
 
 export default function LandingPage() {
   const router = useRouter()
-  const [petProfile, setPetProfile] = useState<PetProfile | null>(null)
+  const [petProfile, setPetProfile] = useState<CatProfile | null>(null)
   const [showSetup, setShowSetup] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
 
   // Hydration-safe data loading
   useEffect(() => {
-    const profile = loadPetProfile()
+    const profile = loadCatProfile()
     setPetProfile(profile)
     setIsHydrated(true)
   }, [])
 
-  const handleProfileSave = (profile: PetProfile) => {
-    savePetProfile(profile)
+  const handleProfileSave = (profile: CatProfile) => {
+    saveCatProfile(profile)
     setPetProfile(profile)
     // Navigate to app after creating profile
     router.push('/app')
@@ -145,7 +145,7 @@ export default function LandingPage() {
             <p className="text-sm text-muted-foreground mb-2 text-center">
               Your Pet
             </p>
-            <PetProfileCard 
+            <CatProfileCard 
               profile={petProfile} 
               onEdit={handleEditProfile}
               size="md"
@@ -192,7 +192,7 @@ export default function LandingPage() {
       </footer>
 
       {/* Profile Setup Modal */}
-      <PetProfileSetup
+      <CatProfileSetup
         isOpen={showSetup}
         onClose={() => setShowSetup(false)}
         onSave={handleProfileSave}

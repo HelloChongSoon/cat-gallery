@@ -30,12 +30,27 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "lib/**/*.ts",
+    "next.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "cat-gallery",
+    "data",
+    "dist",
+    "pagebuilder",
+    "repo",
+    "scripts",
+    "site",
+    "supabase",
+    "Wildflowers"
   ]
 }

@@ -27,7 +27,7 @@ import { generateCareInterpretation } from '@/lib/interpretation-generator'
 import type { 
   CatProfile, 
   CatRoutine,
-  MeowSound, 
+  MeowSoundDetails, 
   MeowContext, 
   CareInterpretation,
   MeowLogEntry,
@@ -41,7 +41,7 @@ export default function AppPage() {
   const [catProfile, setCatProfile] = useState<CatProfile | null>(null)
   const [catRoutine, setCatRoutine] = useState<CatRoutine | null>(null)
   const [recordingState, setRecordingState] = useState<RecordingState>('idle')
-  const [currentSound, setCurrentSound] = useState<MeowSound | null>(null)
+  const [currentSound, setCurrentSound] = useState<MeowSoundDetails | null>(null)
   const [currentContext, setCurrentContext] = useState<MeowContext | null>(null)
   const [interpretation, setInterpretation] = useState<CareInterpretation | null>(null)
   const [currentLogEntry, setCurrentLogEntry] = useState<MeowLogEntry | null>(null)
@@ -138,7 +138,7 @@ export default function AppPage() {
     setRecordingState('context-tagging')
   }, [catProfile, isDemoMode, mock, agora])
 
-  const handleContextComplete = useCallback((sound: MeowSound, context: MeowContext) => {
+  const handleContextComplete = useCallback((sound: MeowSoundDetails, context: MeowContext) => {
     if (!catProfile || !catRoutine) return
 
     setCurrentSound(sound)

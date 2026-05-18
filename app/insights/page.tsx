@@ -96,13 +96,14 @@ export default function InsightsPage() {
     let totalWithFeedback = 0
 
     logs.forEach(log => {
-      const hour = new Date(log.timestamp).getHours()
+      const hour = new Date(log.timestamp || log.createdAt).getHours()
       hourCounts[hour] = (hourCounts[hour] || 0) + 1
       
       moodCounts[log.interpretation.mood]++
-      soundCounts[log.sound]++
+      soundCounts[log.sound.soundType]++
       
-      log.context.situations.forEach(situation => {
+      const situations = log.context.situations?.length ? log.context.situations : [log.context.situation]
+      situations.forEach(situation => {
         contextCounts[situation] = (contextCounts[situation] || 0) + 1
       })
 
@@ -150,7 +151,7 @@ export default function InsightsPage() {
       soundCounts,
       logsThisWeek: logs.filter(log => {
         const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-        return new Date(log.timestamp).getTime() > weekAgo
+        return new Date(log.timestamp || log.createdAt).getTime() > weekAgo
       }).length,
     }
   }, [logs])

@@ -240,7 +240,7 @@ export function loadSettings(): AppSettings {
 export function getMeowLogsForRange(startDate: Date, endDate: Date): MeowLogEntry[] {
   const logs = loadMeowLogs()
   return logs.filter(log => {
-    const logTime = new Date(log.timestamp).getTime()
+    const logTime = new Date(log.timestamp || log.createdAt).getTime()
     return logTime >= startDate.getTime() && logTime <= endDate.getTime()
   })
 }
